@@ -35,3 +35,9 @@ cortex_community-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# Ignore .env file with secrets
+.env
+
+# Ignore direnv
+.direnv/
+

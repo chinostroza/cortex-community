@@ -14,14 +14,21 @@ defmodule CortexCommunity.Application do
     print_banner()
 
     # Configure Cortex Core from environment
-    cortex_config = configure_cortex()
+    _cortex_config = configure_cortex()
 
     children = [
       # Start Telemetry supervisor
       CortexCommunityWeb.Telemetry,
 
-      # Start Cortex Core with configuration
-      {CortexCore, cortex_config},
+      # Start CortexCore supervisor
+      %{
+        id: CortexCore,
+        start: {CortexCore, :start_link, [[
+          strategy: String.to_atom(System.get_env("WORKER_POOL_STRATEGY", "local_first")),
+          health_check_interval: String.to_integer(System.get_env("HEALTH_CHECK_INTERVAL", "30")) * 1000
+        ]]},
+        type: :supervisor
+      },
 
       # Start simple stats collector
       CortexCommunity.StatsCollector,
@@ -72,9 +79,7 @@ defmodule CortexCommunity.Application do
 
     [
       strategy: strategy,
-      health_check_interval: health_check,
-      registry_name: CortexCommunity.Workers.Registry,
-      pool_name: CortexCommunity.Workers.Pool
+      health_check_interval: health_check
     ]
   end
 

@@ -1,5 +1,20 @@
 import Config
 
+# Load .env file automatically in development
+if File.exists?(".env") do
+  ".env"
+  |> File.read!()
+  |> String.split("\n", trim: true)
+  |> Enum.reject(&String.starts_with?(&1, "#"))
+  |> Enum.reject(&(&1 == ""))
+  |> Enum.each(fn line ->
+    case String.split(line, "=", parts: 2) do
+      [key, value] -> System.put_env(key, value)
+      _ -> :ok
+    end
+  end)
+end
+
 # For development, we disable any cache and enable
 # debugging and code reloading.
 #
@@ -73,3 +88,6 @@ config :phoenix_live_view,
   debug_attributes: true,
   # Enable helpful, but potentially expensive runtime checks
   enable_expensive_runtime_checks: true
+
+# Remove the CortexCore config from dev.exs since it's now in runtime.exs
+# This avoids conflicts and ensures runtime.exs takes precedence

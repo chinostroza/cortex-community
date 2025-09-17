@@ -85,7 +85,7 @@ defmodule CortexCommunityWeb.ChatController do
           # Send completion event
           duration = System.monotonic_time(:millisecond) - start_time
 
-          completion_data = %{
+          _completion_data = %{
             event: "done",
             tokens: token_count,
             duration_ms: duration

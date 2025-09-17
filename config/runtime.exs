@@ -20,6 +20,65 @@ if System.get_env("PHX_SERVER") do
   config :cortex_community, CortexCommunityWeb.Endpoint, server: true
 end
 
+# Configure CortexCore workers at runtime
+workers = []
+
+# Check for API keys using the names from your .env file
+workers = if api_keys = System.get_env("ANTHROPIC_API_KEYS") do
+  [%{
+    name: "anthropic-main",
+    type: :anthropic,
+    api_keys: String.split(api_keys, ",", trim: true),
+    model: System.get_env("ANTHROPIC_MODEL", "claude-3-sonnet-20240229")
+  } | workers]
+else
+  workers
+end
+
+workers = if api_keys = System.get_env("GROQ_API_KEYS") do
+  [%{
+    name: "groq-main",
+    type: :groq,
+    api_keys: String.split(api_keys, ",", trim: true),
+    model: System.get_env("GROQ_MODEL", "llama-3.1-8b-instant")
+  } | workers]
+else
+  workers
+end
+
+workers = if api_keys = System.get_env("GEMINI_API_KEYS") do
+  [%{
+    name: "gemini-main",
+    type: :gemini,
+    api_keys: String.split(api_keys, ",", trim: true),
+    model: System.get_env("GEMINI_MODEL", "gemini-2.0-flash-001")
+  } | workers]
+else
+  workers
+end
+
+workers = if api_key = System.get_env("OPENAI_API_KEY") do
+  [%{
+    name: "openai-main",
+    type: :openai,
+    api_keys: [api_key],
+    model: "gpt-4"
+  } | workers]
+else
+  workers
+end
+
+# Always add Ollama worker (doesn't need API key)
+workers = [%{
+  name: "ollama-local",
+  type: :ollama,
+  base_url: System.get_env("OLLAMA_URL", "http://localhost:11434")
+} | workers]
+
+config :cortex_core,
+  workers: workers,
+  worker_pool_strategy: String.to_atom(System.get_env("WORKER_POOL_STRATEGY", "local_first"))
+
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you

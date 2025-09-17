@@ -13,7 +13,7 @@ config :cortex_community,
 # Configures the endpoint
 config :cortex_community, CortexCommunityWeb.Endpoint,
   url: [host: "localhost"],
-  adapter: Bandit.PhoenixAdapter,
+  adapter: Phoenix.Endpoint.Cowboy2Adapter,
   render_errors: [
     formats: [html: CortexCommunityWeb.ErrorHTML, json: CortexCommunityWeb.ErrorJSON],
     layout: false
@@ -49,6 +49,22 @@ config :logger, :default_formatter,
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
+
+# Configure CortexCore
+config :cortex_core,
+  workers: [
+    # Example workers - uncomment and add your API keys
+    # %{
+    #   name: "openai-main",
+    #   type: :openai,
+    #   api_key: System.get_env("OPENAI_API_KEY")
+    # },
+    # %{
+    #   name: "anthropic-main", 
+    #   type: :anthropic,
+    #   api_key: System.get_env("ANTHROPIC_API_KEY")
+    # }
+  ]
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

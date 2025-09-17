@@ -137,12 +137,12 @@ defmodule CortexCommunityWeb.PageController do
       <h2>Quick Start</h2>
       <p>Send a request to the API:</p>
       <pre class="code-block">curl -N -X POST http://localhost:4000/api/chat \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "messages": [
-      {"role": "user", "content": "Hello, how are you?"}
-    ]
-  }'</pre>
+        -H "Content-Type: application/json" \\
+        -d '{
+          "messages": [
+            {"role": "user", "content": "Hello, how are you?"}
+          ]
+        }'</pre>
 
       <h2>Resources</h2>
       <div>
@@ -181,100 +181,5 @@ defmodule CortexCommunityWeb.PageController do
       """
     end)
     |> Enum.join("")
-  end
-end
-
-# lib/cortex_community_web/controllers/docs_controller.ex
-defmodule CortexCommunityWeb.DocsController do
-  use CortexCommunityWeb, :controller
-
-  def api_reference(conn, _params) do
-    html(conn, """
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>API Reference - Cortex Community</title>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@stoplight/elements-dev-portal@1/dist/styles.min.css">
-    </head>
-    <body>
-      <div id="api-docs"></div>
-      <script src="https://cdn.jsdelivr.net/npm/@stoplight/elements-dev-portal@1/dist/web-components.min.js"></script>
-      <script>
-        // Embed OpenAPI spec
-        const spec = #{Jason.encode!(openapi_spec())};
-        const docsElement = document.getElementById('api-docs');
-        docsElement.innerHTML = '<elements-api apiDescriptionDocument=' + JSON.stringify(spec) + ' router="hash" layout="sidebar"/>';
-      </script>
-    </body>
-    </html>
-    """)
-  end
-
-  defp openapi_spec do
-    %{
-      "openapi" => "3.0.0",
-      "info" => %{
-        "title" => "Cortex Community API",
-        "version" => "1.0.0",
-        "description" => "Multi-provider AI Gateway API"
-      },
-      "servers" => [
-        %{"url" => "http://localhost:4000/api"}
-      ],
-      "paths" => %{
-        "/chat" => %{
-          "post" => %{
-            "summary" => "Send chat completion request",
-            "requestBody" => %{
-              "required" => true,
-              "content" => %{
-                "application/json" => %{
-                  "schema" => %{
-                    "type" => "object",
-                    "required" => ["messages"],
-                    "properties" => %{
-                      "messages" => %{
-                        "type" => "array",
-                        "items" => %{
-                          "type" => "object",
-                          "properties" => %{
-                            "role" => %{"type" => "string", "enum" => ["user", "assistant", "system"]},
-                            "content" => %{"type" => "string"}
-                          }
-                        }
-                      },
-                      "provider" => %{"type" => "string", "enum" => ["openai", "anthropic", "gemini", "groq", "ollama"]},
-                      "model" => %{"type" => "string"},
-                      "temperature" => %{"type" => "number", "minimum" => 0, "maximum" => 2},
-                      "max_tokens" => %{"type" => "integer", "minimum" => 1}
-                    }
-                  }
-                }
-              }
-            },
-            "responses" => %{
-              "200" => %{
-                "description" => "Streaming response",
-                "content" => %{
-                  "text/event-stream" => %{
-                    "schema" => %{"type" => "string"}
-                  }
-                }
-              }
-            }
-          }
-        },
-        "/health" => %{
-          "get" => %{
-            "summary" => "Health check",
-            "responses" => %{
-              "200" => %{
-                "description" => "System health status"
-              }
-            }
-          }
-        }
-      }
-    }
   end
 end

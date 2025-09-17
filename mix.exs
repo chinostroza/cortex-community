@@ -15,7 +15,9 @@ defmodule CortexCommunity.MixProject do
       deps: deps(),
       docs: docs(),
       releases: releases(),
-      description: "Open-source AI gateway powered by Cortex Core"
+      description: "Open-source AI gateway powered by Cortex Core",
+      source_url: @source_url,
+      homepage_url: @source_url
     ]
   end
 
@@ -40,7 +42,8 @@ defmodule CortexCommunity.MixProject do
       {:phoenix, "~> 1.7.10"},
       {:phoenix_html, "~> 3.3"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 0.20.1"},
+      {:phoenix_live_view, "~> 1.0.0"},
+      {:phoenix_live_dashboard, "~> 0.8.0"},
       {:floki, ">= 0.30.0", only: :test},
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.2", runtime: Mix.env() == :dev},
@@ -49,6 +52,7 @@ defmodule CortexCommunity.MixProject do
       {:plug_cowboy, "~> 2.5"},
       {:cors_plug, "~> 3.0"},
       {:jason, "~> 1.2"},
+      {:gettext, "~> 0.24"},
 
       # Monitoring & Telemetry (basic)
       {:telemetry_metrics, "~> 0.6"},
@@ -56,7 +60,6 @@ defmodule CortexCommunity.MixProject do
 
       # Development & Testing
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:ex_doc, "~> 0.30", only: :dev, runtime: false}
     ]
   end
