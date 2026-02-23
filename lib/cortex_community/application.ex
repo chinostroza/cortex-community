@@ -153,25 +153,63 @@ defmodule CortexCommunity.Application do
 
     if user do
       # Generar API key y guardarlo en /tmp
-      case Users.create_api_key(user.id, %{name: "auto"}) do
-        {:ok, api_key} ->
-          File.write("/tmp/cortex_api_key.txt", api_key.key)
-          Logger.info("🔑 API key listo: #{api_key.key}")
-        _ -> :ok
-      end
+      api_key_value = get_api_key_value(user.id)
 
       # Leer y guardar credenciales OAuth del Claude Code CLI
-      case ClaudeCliReader.read_credentials() do
+      oauth_ok = case ClaudeCliReader.read_credentials() do
         {:ok, creds} ->
           case Credentials.store_credentials(user.id, "anthropic_cli", creds) do
             {:ok, _} ->
               sub = Map.get(creds, :subscription_type, "desconocida")
               Logger.info("✅ Credenciales OAuth cargadas (suscripción: #{sub})")
-            _ -> :ok
+              true
+            _ -> false
           end
         {:error, reason} ->
           Logger.warning("⚠️  No se encontraron credenciales OAuth: #{inspect(reason)}. Abre Claude Code CLI para autenticarte.")
+          false
       end
+
+      # Validar que el gateway responde correctamente
+      if oauth_ok do
+        validate_gateway(api_key_value)
+      end
+    end
+  end
+
+  defp get_api_key_value(user_id) do
+    case CortexCommunity.Users.create_api_key(user_id, %{name: "auto"}) do
+      {:ok, api_key} ->
+        File.write("/tmp/cortex_api_key.txt", api_key.key)
+        Logger.info("🔑 API key listo: #{api_key.key}")
+        api_key.key
+      _ -> nil
+    end
+  end
+
+  defp validate_gateway(nil), do: :ok
+  defp validate_gateway(api_key) do
+    port = Application.get_env(:cortex_community, CortexCommunityWeb.Endpoint)[:http][:port] || 4000
+    url = "http://localhost:#{port}/api/chat"
+
+    body = Jason.encode!(%{
+      messages: [%{role: "user", content: "responde solo: ok"}],
+      model: "claude-sonnet-4-5-20250929",
+      stream: false
+    })
+
+    case Req.post(url,
+      headers: [{"authorization", "Bearer #{api_key}"}, {"content-type", "application/json"}],
+      body: body,
+      receive_timeout: 30_000
+    ) do
+      {:ok, %{status: status}} when status in 200..299 ->
+        IO.puts("\n✅ Cortex listo — OAuth con Claude Max funcionando")
+        IO.puts("   API Key: #{api_key}\n")
+      {:ok, %{status: status, body: body}} ->
+        Logger.warning("⚠️  Validación falló (HTTP #{status}): #{inspect(body)}")
+      {:error, reason} ->
+        Logger.warning("⚠️  No se pudo validar el gateway: #{inspect(reason)}")
     end
   end
 
