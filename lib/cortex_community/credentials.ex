@@ -115,11 +115,12 @@ defmodule CortexCommunity.Credentials do
   @aad "cortex_credentials_v1"
 
   defp encryption_key do
-    secret = Application.get_env(:cortex_community, :secret_key_base) ||
-             System.get_env("SECRET_KEY_BASE") ||
-             raise "SECRET_KEY_BASE not set — cannot encrypt credentials"
+    secret =
+      (Application.get_env(:cortex_community, CortexCommunityWeb.Endpoint) || [])
+      |> Keyword.get(:secret_key_base) ||
+      System.get_env("SECRET_KEY_BASE") ||
+      raise "SECRET_KEY_BASE not configured — cannot encrypt credentials"
 
-    # Derive a 32-byte key using HKDF-like approach with :crypto.mac
     :crypto.mac(:hmac, :sha256, secret, "cortex_credentials_encryption_key")
   end
 
