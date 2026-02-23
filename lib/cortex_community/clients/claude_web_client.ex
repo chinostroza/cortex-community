@@ -36,7 +36,7 @@ defmodule CortexCommunity.Clients.ClaudeWebClient do
     end
   end
 
-  defp do_chat(messages, access_token, opts) do
+  defp do_chat(_messages, _access_token, opts) do
     # TODO: Update with actual endpoint from mitmproxy capture
     # Expected format based on research:
     # POST https://claude.ai/api/organizations/{org_id}/chat_conversations/{conversation_id}/completion

@@ -158,7 +158,7 @@ defmodule CortexCommunity.Clients.ClaudeOAuthClient do
     end
   end
 
-  defp create_stream(%HTTPoison.AsyncResponse{id: async_id} = async_response) do
+  defp create_stream(%HTTPoison.AsyncResponse{id: _async_id} = async_response) do
     Stream.resource(
       fn -> {async_response, ""} end,
       fn {async_resp, buffer} ->
