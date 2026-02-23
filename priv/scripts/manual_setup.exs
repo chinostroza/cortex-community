@@ -1,27 +1,37 @@
-# Manual setup script for testing
-alias CortexCommunity.{Users, Credentials, Repo}
+# Setup script: creates user, API key, and loads real OAuth credentials from Claude Code CLI
+alias CortexCommunity.{Users, Credentials, Auth.ClaudeCliReader}
 
-IO.puts("\n🔧 Iniciando setup manual de Cortex...")
+IO.puts("\nIniciando setup de Cortex...")
 
-# Crear usuario
-{:ok, user} = Users.create_user(%{username: "default", name: "Default User"})
-IO.puts("\n✓ Usuario creado: #{user.username} (ID: #{user.id})")
+# Crear o recuperar usuario default
+user = case Users.get_user_by_username("default") do
+  nil ->
+    {:ok, u} = Users.create_user(%{username: "default", name: "Default User"})
+    IO.puts("\n✓ Usuario creado: #{u.username} (ID: #{u.id})")
+    u
+  existing ->
+    IO.puts("\n✓ Usuario existente: #{existing.username} (ID: #{existing.id})")
+    existing
+end
 
 # Crear API key
-{:ok, api_key} = Users.create_api_key(user.id, %{name: "Test API Key"})
+{:ok, api_key} = Users.create_api_key(user.id, %{name: "Default API Key"})
 IO.puts("\n✓ API Key generado:")
 IO.puts("  " <> IO.ANSI.bright() <> IO.ANSI.white() <> api_key.key <> IO.ANSI.reset())
 
-# Guardar credenciales de prueba (simulando Claude Code CLI)
-fake_creds = %{
-  type: :oauth,
-  access_token: "test_token_123",
-  refresh_token: "refresh_123",
-  expires: System.system_time(:millisecond) + 3_600_000  # 1 hora
-}
+# Leer credenciales reales del Claude Code CLI (Keychain o archivo)
+IO.puts("\nLeyendo credenciales OAuth del Claude Code CLI...")
 
-{:ok, _cred} = Credentials.store_credentials(user.id, "anthropic_cli", fake_creds)
-IO.puts("\n✓ Credenciales guardadas para: anthropic_cli")
+case ClaudeCliReader.read_credentials() do
+  {:ok, real_creds} ->
+    {:ok, _cred} = Credentials.store_credentials(user.id, "anthropic_cli", real_creds)
+    sub_type = Map.get(real_creds, :subscription_type, "desconocida")
+    IO.puts("✓ Credenciales OAuth reales guardadas (suscripción: #{sub_type})")
+
+  {:error, reason} ->
+    IO.puts(IO.ANSI.yellow() <> "⚠ No se encontraron credenciales OAuth: #{inspect(reason)}" <> IO.ANSI.reset())
+    IO.puts(IO.ANSI.yellow() <> "  Asegúrate de tener Claude Code CLI autenticado." <> IO.ANSI.reset())
+end
 
 IO.puts("\n" <> IO.ANSI.green() <> "═══════════════════════════════════════" <> IO.ANSI.reset())
 IO.puts(IO.ANSI.green() <> "✓ Setup manual completado!" <> IO.ANSI.reset())

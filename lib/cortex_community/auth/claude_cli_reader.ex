@@ -25,8 +25,10 @@ defmodule CortexCommunity.Auth.ClaudeCliReader do
   require Logger
 
   @keychain_service "Claude Code-credentials"
-  @keychain_account "Claude Code"
   @credentials_file_path "~/.claude/.credentials.json"
+
+  # The account name in Keychain matches the system username, not "Claude Code"
+  defp keychain_account, do: System.get_env("USER") || System.get_env("USERNAME") || "Claude Code"
 
   @doc """
   Reads Claude CLI credentials from Keychain (macOS) or file.
@@ -53,7 +55,7 @@ defmodule CortexCommunity.Auth.ClaudeCliReader do
         [
           "find-generic-password",
           "-s", @keychain_service,
-          "-a", @keychain_account,
+          "-a", keychain_account(),
           "-w"  # Output password only
         ],
         stderr_to_stdout: true
@@ -114,12 +116,15 @@ defmodule CortexCommunity.Auth.ClaudeCliReader do
 
       refresh_token = get_string(oauth, "refreshToken") |> elem(1)
 
+      subscription_type = Map.get(oauth, "subscriptionType")
+
       credentials = %{
         type: if(refresh_token, do: :oauth, else: :token),
         provider: :anthropic,
         access_token: access_token,
         refresh_token: refresh_token,
-        expires: expires_at
+        expires: expires_at,
+        subscription_type: subscription_type
       }
 
       {:ok, credentials}
