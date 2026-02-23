@@ -62,7 +62,7 @@ defmodule CortexCommunityWeb.ChatController do
         |> stream_response(stream, start_time)
 
       {:fallback, reason} ->
-        Logger.debug("→ Falling back to server credentials: #{reason}")
+        Logger.warning("⚠️  OAuth falló (#{reason}), usando credenciales del servidor (Gemini/Groq)")
         dispatch_with_server_credentials(conn, messages, opts, start_time)
     end
   end
