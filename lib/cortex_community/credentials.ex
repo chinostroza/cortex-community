@@ -112,15 +112,44 @@ defmodule CortexCommunity.Credentials do
   end
   defp extract_expiry(_), do: nil
 
+  @aad "cortex_credentials_v1"
+
+  defp encryption_key do
+    secret = Application.get_env(:cortex_community, :secret_key_base) ||
+             System.get_env("SECRET_KEY_BASE") ||
+             raise "SECRET_KEY_BASE not set — cannot encrypt credentials"
+
+    # Derive a 32-byte key using HKDF-like approach with :crypto.mac
+    :crypto.mac(:hmac, :sha256, secret, "cortex_credentials_encryption_key")
+  end
+
   defp encrypt_credentials(data) when is_map(data) do
-    # TODO: Implement proper encryption
-    # For now, just encode as JSON
-    Jason.encode!(data)
+    plaintext = Jason.encode!(data)
+    key = encryption_key()
+    iv = :crypto.strong_rand_bytes(12)
+
+    {ciphertext, tag} = :crypto.crypto_one_time_aead(
+      :aes_256_gcm, key, iv, plaintext, @aad, true
+    )
+
+    # Encode as base64: iv(12) + tag(16) + ciphertext
+    Base.encode64(iv <> tag <> ciphertext)
   end
 
   defp decrypt_credentials(encrypted_data) when is_binary(encrypted_data) do
-    # TODO: Implement proper decryption
-    # For now, just decode JSON
-    Jason.decode!(encrypted_data, keys: :atoms)
+    key = encryption_key()
+    raw = Base.decode64!(encrypted_data)
+
+    <<iv::binary-12, tag::binary-16, ciphertext::binary>> = raw
+
+    case :crypto.crypto_one_time_aead(
+      :aes_256_gcm, key, iv, ciphertext, @aad, tag, false
+    ) do
+      plaintext when is_binary(plaintext) ->
+        Jason.decode!(plaintext, keys: :atoms)
+
+      :error ->
+        raise "Failed to decrypt credentials — data may be corrupted or key changed"
+    end
   end
 end

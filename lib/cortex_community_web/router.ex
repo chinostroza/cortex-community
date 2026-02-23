@@ -4,7 +4,21 @@ defmodule CortexCommunityWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
-    plug CORSPlug, origin: "*"
+    plug CORSPlug,
+      origin: [
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:4000",
+        "http://localhost:4200",
+        "http://localhost:5173",
+        "http://localhost:8080",
+        "http://localhost:8000",
+        "http://127.0.0.1",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8080"
+      ],
+      methods: ["GET", "POST", "OPTIONS"],
+      headers: ["Authorization", "Content-Type", "Accept"]
     plug CortexCommunityWeb.Plugs.RequestLogger
   end
 

@@ -181,7 +181,9 @@ defmodule CortexCommunity.Application do
     case CortexCommunity.Users.get_or_create_api_key(user_id, %{name: "default"}) do
       {:ok, api_key} ->
         File.write("/tmp/cortex_api_key.txt", api_key.key)
-        Logger.info("🔑 API key listo: #{api_key.key}")
+        File.chmod("/tmp/cortex_api_key.txt", 0o600)
+        key_preview = CortexCommunity.Users.preview_api_key(api_key.key)
+        Logger.info("🔑 API key lista: #{key_preview}")
         api_key.key
       _ -> nil
     end
@@ -213,7 +215,7 @@ defmodule CortexCommunity.Application do
         │  Pregunta: ¿Qué modelo eres?                │
         │  Respuesta: #{String.slice(response_text, 0, 200)}
         │                                             │
-        │  API Key: #{api_key}  │
+        │  API Key: #{CortexCommunity.Users.preview_api_key(api_key)}  │
         └─────────────────────────────────────────────┘
         """)
       {:ok, %{status: status, body: resp_body}} ->

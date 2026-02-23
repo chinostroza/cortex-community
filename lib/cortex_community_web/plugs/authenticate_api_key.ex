@@ -35,10 +35,13 @@ defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
       |> assign(:authenticated_via, :api_key)
     else
       {:error, :missing_authorization} ->
-        # No API key provided - could allow anonymous access or require auth
-        # For now, we'll allow the request to continue without a user
-        # This maintains backward compatibility
         conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(401, Jason.encode!(%{
+          error: "unauthorized",
+          message: "Missing Authorization header. Use: Bearer ctx_..."
+        }))
+        |> halt()
 
       {:error, reason} ->
         # Invalid or expired API key

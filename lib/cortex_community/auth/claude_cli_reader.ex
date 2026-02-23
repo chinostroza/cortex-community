@@ -67,7 +67,7 @@ defmodule CortexCommunity.Auth.ClaudeCliReader do
       |> parse_claude_oauth()
       |> case do
         {:ok, creds} ->
-          Logger.info("Read Claude CLI credentials from Keychain")
+          Logger.debug("Read Claude CLI credentials from Keychain")
           {:ok, creds}
         error ->
           error
@@ -93,7 +93,7 @@ defmodule CortexCommunity.Auth.ClaudeCliReader do
         |> parse_claude_oauth()
         |> case do
           {:ok, creds} ->
-            Logger.info("Read Claude CLI credentials from file: #{file_path}")
+            Logger.debug("Read Claude CLI credentials from file")
             {:ok, creds}
           error ->
             error
