@@ -51,6 +51,20 @@ defmodule CortexCommunity.Application do
     case Supervisor.start_link(children, opts) do
       {:ok, pid} ->
         Logger.info("🚀 Cortex Community started successfully!")
+        # Configure workers synchronously to ensure they're ready on startup
+        Task.start(fn ->
+          :timer.sleep(500)
+          try do
+            CortexCore.Workers.Supervisor.configure_initial_workers(CortexCore.Workers.Registry)
+          rescue
+            e -> Logger.error("Failed to configure workers: #{inspect(e)}")
+          end
+        end)
+        # Auto-setup default user and OAuth credentials on startup
+        Task.start(fn ->
+          :timer.sleep(1000)
+          auto_setup()
+        end)
         print_status()
         {:ok, pid}
 
@@ -122,6 +136,43 @@ defmodule CortexCommunity.Application do
     IO.puts("📚 Documentation at: http://localhost:#{port}/docs")
     IO.puts("💓 Health check at: http://localhost:#{port}/health")
     IO.puts("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+  end
+
+  defp auto_setup do
+    alias CortexCommunity.{Users, Credentials, Auth.ClaudeCliReader}
+
+    # Crear usuario default si no existe
+    user = case Users.get_user_by_username("default") do
+      nil ->
+        case Users.create_user(%{username: "default", name: "Default User"}) do
+          {:ok, u} -> u
+          _ -> nil
+        end
+      existing -> existing
+    end
+
+    if user do
+      # Generar API key y guardarlo en /tmp
+      case Users.create_api_key(user.id, %{name: "auto"}) do
+        {:ok, api_key} ->
+          File.write("/tmp/cortex_api_key.txt", api_key.key)
+          Logger.info("🔑 API key listo: #{api_key.key}")
+        _ -> :ok
+      end
+
+      # Leer y guardar credenciales OAuth del Claude Code CLI
+      case ClaudeCliReader.read_credentials() do
+        {:ok, creds} ->
+          case Credentials.store_credentials(user.id, "anthropic_cli", creds) do
+            {:ok, _} ->
+              sub = Map.get(creds, :subscription_type, "desconocida")
+              Logger.info("✅ Credenciales OAuth cargadas (suscripción: #{sub})")
+            _ -> :ok
+          end
+        {:error, reason} ->
+          Logger.warning("⚠️  No se encontraron credenciales OAuth: #{inspect(reason)}. Abre Claude Code CLI para autenticarte.")
+      end
+    end
   end
 
   defp version do

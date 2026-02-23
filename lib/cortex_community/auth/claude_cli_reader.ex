@@ -36,7 +36,7 @@ defmodule CortexCommunity.Auth.ClaudeCliReader do
   Returns `{:ok, credentials}` if found, `{:error, reason}` otherwise.
   """
   def read_credentials(opts \\ []) do
-    platform = Keyword.get(opts, :platform, :os.type() |> elem(0))
+    platform = Keyword.get(opts, :platform, :os.type() |> elem(1))
 
     case platform do
       :darwin -> read_from_keychain() || read_from_file()
