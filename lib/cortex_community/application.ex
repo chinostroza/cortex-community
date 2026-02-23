@@ -28,7 +28,7 @@ defmodule CortexCommunity.Application do
         id: CortexCore,
         start: {CortexCore, :start_link, [[
           strategy: String.to_atom(System.get_env("WORKER_POOL_STRATEGY", "local_first")),
-          health_check_interval: String.to_integer(System.get_env("HEALTH_CHECK_INTERVAL", "30")) * 1000
+          check_interval: :disabled
         ]]},
         type: :supervisor
       },
@@ -89,15 +89,7 @@ defmodule CortexCommunity.Application do
       _ -> :local_first
     end
 
-    health_check = case System.get_env("HEALTH_CHECK_INTERVAL", "30") do
-      "0" -> 0
-      interval -> String.to_integer(interval) * 1000
-    end
-
-    [
-      strategy: strategy,
-      health_check_interval: health_check
-    ]
+    [strategy: strategy]
   end
 
   defp print_banner do
