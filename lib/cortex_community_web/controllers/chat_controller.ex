@@ -4,6 +4,11 @@ defmodule CortexCommunityWeb.ChatController do
   require Logger
 
   alias CortexCommunity.StatsCollector
+  alias CortexCommunity.Credentials
+  alias CortexCommunity.Clients.ClaudeOAuthClient
+
+  # Authenticate API key and assign user to conn.assigns.cortex_user
+  plug CortexCommunityWeb.Plugs.AuthenticateApiKey
 
   @doc """
   Main chat endpoint - handles streaming responses from AI providers
@@ -15,15 +20,18 @@ defmodule CortexCommunityWeb.ChatController do
     # Extract options
     opts = extract_options(params)
 
+    # Extract authenticated user from middleware (if present)
+    cortex_user = Map.get(conn.assigns, :cortex_user)
+
     # Log request
-    Logger.info("Chat request received with #{length(messages)} messages")
+    Logger.info("Chat request: user=#{inspect(cortex_user && cortex_user.username)}, messages=#{length(messages)}")
 
     conn
     |> put_resp_header("content-type", "text/event-stream")
     |> put_resp_header("cache-control", "no-cache")
     |> put_resp_header("connection", "keep-alive")
     |> put_resp_header("x-accel-buffering", "no")  # For nginx
-    |> dispatch_and_stream(messages, opts, start_time)
+    |> dispatch_and_stream(messages, opts, cortex_user, start_time)
   end
 
   def create(conn, %{"messages" => _}) do
@@ -36,7 +44,101 @@ defmodule CortexCommunityWeb.ChatController do
 
   # Private functions
 
-  defp dispatch_and_stream(conn, messages, opts, start_time) do
+  defp dispatch_and_stream(conn, messages, opts, nil, start_time) do
+    # No authenticated user → use server API keys (original behavior)
+    Logger.debug("No authenticated user - using server API keys")
+    dispatch_with_server_credentials(conn, messages, opts, start_time)
+  end
+
+  defp dispatch_and_stream(conn, messages, opts, %CortexCommunity.CortexUser{} = user, start_time) do
+    # Authenticated user → try user credentials first, fallback to server if not available
+    case try_user_credentials(user, messages, opts) do
+      {:ok, stream} ->
+        Logger.info("✓ Using user credentials for user=#{user.username}")
+        StatsCollector.track_request(:started)
+
+        conn
+        |> send_chunked(200)
+        |> stream_response(stream, start_time)
+
+      {:fallback, reason} ->
+        Logger.debug("→ Falling back to server credentials: #{reason}")
+        dispatch_with_server_credentials(conn, messages, opts, start_time)
+    end
+  end
+
+  # Try to use user's configured credentials
+  defp try_user_credentials(%CortexCommunity.CortexUser{id: user_id} = user, messages, opts) do
+    provider = determine_provider(opts)
+
+    case Credentials.get_credentials(user_id, provider) do
+      {:ok, user_creds} ->
+        Logger.debug("Found credentials for user=#{user.username}, provider=#{provider}")
+        use_user_credentials(user_creds, messages, opts)
+
+      {:error, :not_found} ->
+        {:fallback, "no credentials configured"}
+
+      {:error, :expired} ->
+        {:fallback, "credentials expired"}
+
+      {:error, reason} ->
+        {:fallback, "error: #{inspect(reason)}"}
+    end
+  end
+
+  defp determine_provider(opts) do
+    model = Keyword.get(opts, :model, "")
+
+    cond do
+      String.contains?(model, "claude") -> "anthropic_cli"
+      String.contains?(model, "gpt") -> "openai"
+      String.contains?(model, "gemini") -> "google"
+      true -> "anthropic_cli"  # default
+    end
+  end
+
+  # Use user's credentials instead of server API keys
+  # Pattern match for OAuth (accepts both atom and string)
+  defp use_user_credentials(%{type: type} = creds, messages, opts) when type in [:oauth, "oauth"] do
+    Logger.debug("Using OAuth token for provider=#{creds.provider}")
+
+    # Check if credentials are still valid
+    if !ClaudeOAuthClient.credentials_valid?(creds) do
+      Logger.warning("OAuth credentials expired")
+      {:fallback, "credentials expired"}
+    else
+      # Make request using OAuth token
+      case ClaudeOAuthClient.chat(messages, creds, opts) do
+        {:ok, stream} ->
+          Logger.info("✓ Successfully using user's Claude Pro subscription via OAuth")
+          {:ok, stream}
+
+        {:error, reason} ->
+          Logger.error("OAuth request failed: #{inspect(reason)}")
+          {:fallback, "oauth request failed: #{inspect(reason)}"}
+      end
+    end
+  end
+
+  defp use_user_credentials(%{api_key: api_key} = creds, messages, opts) do
+    Logger.debug("Using user API key for provider=#{creds.provider}")
+
+    # Inject user's API key into options
+    opts_with_user_key = Keyword.put(opts, :api_key, api_key)
+
+    case CortexCore.chat(messages, opts_with_user_key) do
+      {:ok, stream} -> {:ok, stream}
+      {:error, _} -> {:fallback, "user api key failed"}
+    end
+  end
+
+  defp use_user_credentials(_creds, _messages, _opts) do
+    {:fallback, "unsupported credential type"}
+  end
+
+  # Original dispatch logic (unchanged, now called when no user_id or fallback)
+  defp dispatch_with_server_credentials(conn, messages, opts, start_time) do
     case CortexCore.chat(messages, opts) do
       {:ok, stream} ->
         # Track successful dispatch

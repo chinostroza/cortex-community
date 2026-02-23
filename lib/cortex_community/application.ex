@@ -17,6 +17,9 @@ defmodule CortexCommunity.Application do
     _cortex_config = configure_cortex()
 
     children = [
+      # Start the Ecto repository
+      CortexCommunity.Repo,
+
       # Start Telemetry supervisor
       CortexCommunityWeb.Telemetry,
 

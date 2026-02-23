@@ -8,6 +8,7 @@
 import Config
 
 config :cortex_community,
+  ecto_repos: [CortexCommunity.Repo],
   generators: [timestamp_type: :utc_datetime]
 
 # Configures the endpoint

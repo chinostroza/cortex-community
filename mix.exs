@@ -34,9 +34,9 @@ defmodule CortexCommunity.MixProject do
   defp deps do
     [
       # Core AI functionality
-      {:cortex_core, "~> 1.0.2"},
+      # {:cortex_core, "~> 1.0.2"},
       # Or for local development:
-      # {:cortex_core, path: "../cortex_core"},
+      {:cortex_core, path: "../cortex-core/cortex_core"},
 
       # Phoenix Framework
       {:phoenix, "~> 1.7.10"},
@@ -52,6 +52,7 @@ defmodule CortexCommunity.MixProject do
       {:plug_cowboy, "~> 2.5"},
       {:cors_plug, "~> 3.0"},
       {:jason, "~> 1.2"},
+      {:httpoison, "~> 2.0"},
       {:gettext, "~> 0.24"},
 
       # Monitoring & Telemetry (basic)
@@ -60,13 +61,22 @@ defmodule CortexCommunity.MixProject do
 
       # Development & Testing
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.30", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.30", only: :dev, runtime: false},
+
+      # Environment variables
+      {:dotenvy, "~> 0.8.0"},
+
+      # Database
+      {:ecto_sql, "~> 3.11"},
+      {:postgrex, ">= 0.0.0"}
     ]
   end
 
   defp aliases do
     [
-      setup: ["deps.get", "assets.setup", "assets.build"],
+      setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
+      "ecto.setup": ["ecto.create", "ecto.migrate"],
+      "ecto.reset": ["ecto.drop", "ecto.setup"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind default", "esbuild default"],
       "assets.deploy": ["tailwind default --minify", "esbuild default --minify", "phx.digest"],

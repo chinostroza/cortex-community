@@ -28,7 +28,7 @@ config :cortex_community, CortexCommunityWeb.Endpoint,
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "rIrSoqhiSL0tOqGPbY0v1sggtCCNVuHPByy6FyUQcATFCaAUeoM/R+lmM2HRycFt",
+  secret_key_base: System.get_env("SECRET_KEY_BASE") || "dev_secret_key_base_change_me_in_production",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:cortex_community, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:cortex_community, ~w(--watch)]}
@@ -91,3 +91,13 @@ config :phoenix_live_view,
 
 # Remove the CortexCore config from dev.exs since it's now in runtime.exs
 # This avoids conflicts and ensures runtime.exs takes precedence
+
+# Configure your database
+config :cortex_community, CortexCommunity.Repo,
+  username: "dev",
+  password: "",
+  hostname: "localhost",
+  database: "cortex_community_dev",
+  stacktrace: true,
+  show_sensitive_data_on_connection_error: true,
+  pool_size: 10
