@@ -193,7 +193,7 @@ defmodule CortexCommunity.Application do
     url = "http://localhost:#{port}/api/chat"
 
     body = Jason.encode!(%{
-      messages: [%{role: "user", content: "responde solo: ok"}],
+      messages: [%{role: "user", content: "¿Qué modelo eres y qué tipo de suscripción estás usando? Responde en una línea."}],
       model: "claude-sonnet-4-5-20250929",
       stream: false
     })
@@ -203,15 +203,44 @@ defmodule CortexCommunity.Application do
       body: body,
       receive_timeout: 30_000
     ) do
-      {:ok, %{status: status}} when status in 200..299 ->
-        IO.puts("\n✅ Cortex listo — OAuth con Claude Max funcionando")
-        IO.puts("   API Key: #{api_key}\n")
-      {:ok, %{status: status, body: body}} ->
-        Logger.warning("⚠️  Validación falló (HTTP #{status}): #{inspect(body)}")
+      {:ok, %{status: status, body: raw_body}} when status in 200..299 ->
+        response_text = parse_sse_body(raw_body)
+        IO.puts("""
+
+        ┌─────────────────────────────────────────────┐
+        │  ✅  Cortex Gateway — Validación exitosa     │
+        ├─────────────────────────────────────────────┤
+        │  Pregunta: ¿Qué modelo eres?                │
+        │  Respuesta: #{String.slice(response_text, 0, 200)}
+        │                                             │
+        │  API Key: #{api_key}  │
+        └─────────────────────────────────────────────┘
+        """)
+      {:ok, %{status: status, body: resp_body}} ->
+        Logger.warning("⚠️  Validación falló (HTTP #{status}): #{inspect(resp_body)}")
       {:error, reason} ->
         Logger.warning("⚠️  No se pudo validar el gateway: #{inspect(reason)}")
     end
   end
+
+  defp parse_sse_body(body) when is_binary(body) do
+    body
+    |> String.split("\n")
+    |> Enum.filter(&String.starts_with?(&1, "data:"))
+    |> Enum.map(fn line ->
+      line
+      |> String.replace_prefix("data:", "")
+      |> String.trim()
+      |> Jason.decode()
+      |> case do
+        {:ok, %{"content" => content}} -> content
+        _ -> ""
+      end
+    end)
+    |> Enum.join("")
+    |> String.trim()
+  end
+  defp parse_sse_body(_), do: ""
 
   defp version do
     Application.spec(:cortex_community, :vsn) |> to_string()
