@@ -178,7 +178,7 @@ defmodule CortexCommunity.Application do
   end
 
   defp get_api_key_value(user_id) do
-    case CortexCommunity.Users.create_api_key(user_id, %{name: "auto"}) do
+    case CortexCommunity.Users.get_or_create_api_key(user_id, %{name: "default"}) do
       {:ok, api_key} ->
         File.write("/tmp/cortex_api_key.txt", api_key.key)
         Logger.info("🔑 API key listo: #{api_key.key}")

@@ -105,6 +105,25 @@ defmodule CortexCommunity.Users do
   end
 
   @doc """
+  Gets the existing active API key for a user, or creates one if none exists.
+
+  Keys without expiry are preferred. This ensures the same key is reused
+  across server restarts instead of generating a new one each time.
+  """
+  def get_or_create_api_key(user_id, attrs \\ %{}) do
+    query =
+      from k in CortexApiKey,
+        where: k.user_id == ^user_id and k.is_active == true and is_nil(k.expires_at),
+        order_by: [asc: k.inserted_at],
+        limit: 1
+
+    case Repo.one(query) do
+      nil -> create_api_key(user_id, attrs)
+      existing -> {:ok, existing}
+    end
+  end
+
+  @doc """
   Lists all API keys for a user.
   """
   def list_user_api_keys(user_id) do
