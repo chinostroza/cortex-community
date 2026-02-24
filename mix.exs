@@ -15,6 +15,16 @@ defmodule CortexCommunity.MixProject do
       deps: deps(),
       docs: docs(),
       releases: releases(),
+      dialyzer: [
+        plt_add_apps: [:mix],
+        ignore_warnings: ".dialyzer_ignore.exs"
+      ],
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.html": :test
+      ],
       description: "Open-source AI gateway powered by Cortex Core",
       source_url: @source_url,
       homepage_url: @source_url
@@ -61,6 +71,10 @@ defmodule CortexCommunity.MixProject do
 
       # Development & Testing
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: :test},
+      {:mox, "~> 1.0", only: :test},
       {:ex_doc, "~> 0.30", only: :dev, runtime: false},
 
       # Environment variables
@@ -82,7 +96,7 @@ defmodule CortexCommunity.MixProject do
       "assets.deploy": ["tailwind default --minify", "esbuild default --minify", "phx.digest"],
       test: ["test"],
       "test.coverage": ["test --cover"],
-      quality: ["format", "credo --strict"],
+      quality: ["format", "credo --strict", "sobelow --skip"],
       server: ["phx.server"]
     ]
   end

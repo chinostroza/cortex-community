@@ -7,6 +7,10 @@ config :cortex_community, CortexCommunityWeb.Endpoint,
   secret_key_base: "wnIerl79Hs+9XqrIYgBNqV6U4jjLpU867gerOBGn/pMT+0l0UM8ND2KYftLRZRR+",
   server: false
 
+# Use Mox mocks instead of real implementations in tests
+config :cortex_community, :cortex_core, CortexCore.Mock
+config :cortex_community, :users_module, CortexCommunity.Users.Mock
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 

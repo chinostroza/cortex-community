@@ -1,4 +1,5 @@
 defmodule CortexCommunityWeb.Plugs.RequestLogger do
+  @moduledoc false
   @behaviour Plug
   require Logger
 
@@ -9,11 +10,9 @@ defmodule CortexCommunityWeb.Plugs.RequestLogger do
 
     Plug.Conn.register_before_send(conn, fn conn ->
       duration = System.monotonic_time(:millisecond) - start_time
-      
-      Logger.info(
-        "#{conn.method} #{conn.request_path} - #{conn.status} (#{duration}ms)"
-      )
-      
+
+      Logger.info("#{conn.method} #{conn.request_path} - #{conn.status} (#{duration}ms)")
+
       conn
     end)
   end

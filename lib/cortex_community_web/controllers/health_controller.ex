@@ -2,11 +2,13 @@
 defmodule CortexCommunityWeb.HealthController do
   use CortexCommunityWeb, :controller
 
+  @cortex_core Application.compile_env(:cortex_community, :cortex_core, CortexCore)
+
   @doc """
   Basic health check endpoint
   """
   def index(conn, _params) do
-    health = CortexCore.health_status()
+    health = @cortex_core.health_status()
     available_workers = Enum.count(health, fn {_, status} -> status == :available end)
     total_workers = map_size(health)
 
@@ -24,26 +26,27 @@ defmodule CortexCommunityWeb.HealthController do
   Detailed health status of all workers
   """
   def workers(conn, _params) do
-    health = CortexCore.health_status()
-    workers = CortexCore.list_workers()
+    health = @cortex_core.health_status()
+    workers = @cortex_core.list_workers()
 
-    worker_details = Enum.map(workers, fn worker ->
-      %{
-        name: worker.name,
-        type: worker.type,
-        priority: Map.get(worker, :priority, 100),
-        status: Map.get(health, worker.name, :unknown),
-        api_keys_count: Map.get(worker, :api_keys_count, 0)
-      }
-    end)
+    worker_details =
+      Enum.map(workers, fn worker ->
+        %{
+          name: worker.name,
+          type: worker.type,
+          priority: Map.get(worker, :priority, 100),
+          status: Map.get(health, worker.name, :unknown),
+          api_keys_count: Map.get(worker, :api_keys_count, 0)
+        }
+      end)
 
     json(conn, %{
       workers: worker_details,
       summary: %{
         total: length(worker_details),
-        available: Enum.count(worker_details, & &1.status == :available),
-        unavailable: Enum.count(worker_details, & &1.status == :unavailable),
-        rate_limited: Enum.count(worker_details, & &1.status == :rate_limited)
+        available: Enum.count(worker_details, &(&1.status == :available)),
+        unavailable: Enum.count(worker_details, &(&1.status == :unavailable)),
+        rate_limited: Enum.count(worker_details, &(&1.status == :rate_limited))
       }
     })
   end
@@ -52,7 +55,7 @@ defmodule CortexCommunityWeb.HealthController do
   Detailed system health including stats
   """
   def detailed(conn, _params) do
-    health = CortexCore.health_status()
+    health = @cortex_core.health_status()
     stats = CortexCommunity.StatsCollector.get_stats()
 
     json(conn, %{
@@ -79,26 +82,41 @@ defmodule CortexCommunityWeb.StatsController do
   """
   def index(conn, _params) do
     stats = StatsCollector.get_stats()
+    json(conn, build_stats_response(stats))
+  end
 
-    json(conn, %{
-      requests: %{
-        total: stats[:requests_total] || 0,
-        completed: stats[:requests_completed] || 0,
-        failed: stats[:requests_failed] || 0,
-        no_workers: stats[:requests_no_workers] || 0,
-        active: stats[:requests_active] || 0
-      },
-      performance: %{
-        average_duration_ms: stats[:average_duration] || 0,
-        total_tokens: stats[:total_tokens] || 0,
-        tokens_per_second: stats[:tokens_per_second] || 0
-      },
-      uptime: %{
-        seconds: stats[:uptime_seconds] || 0,
-        formatted: format_uptime(stats[:uptime_seconds] || 0)
-      },
+  defp build_stats_response(stats) do
+    %{
+      requests: build_requests_stats(stats),
+      performance: build_performance_stats(stats),
+      uptime: build_uptime_stats(stats),
       timestamp: DateTime.utc_now()
-    })
+    }
+  end
+
+  defp build_requests_stats(stats) do
+    %{
+      total: stats[:requests_total] || 0,
+      completed: stats[:requests_completed] || 0,
+      failed: stats[:requests_failed] || 0,
+      no_workers: stats[:requests_no_workers] || 0,
+      active: stats[:requests_active] || 0
+    }
+  end
+
+  defp build_performance_stats(stats) do
+    %{
+      average_duration_ms: stats[:average_duration] || 0,
+      total_tokens: stats[:total_tokens] || 0,
+      tokens_per_second: stats[:tokens_per_second] || 0
+    }
+  end
+
+  defp build_uptime_stats(stats) do
+    %{
+      seconds: stats[:uptime_seconds] || 0,
+      formatted: format_uptime(stats[:uptime_seconds] || 0)
+    }
   end
 
   @doc """
@@ -107,24 +125,25 @@ defmodule CortexCommunityWeb.StatsController do
   def providers(conn, _params) do
     stats = StatsCollector.get_provider_stats()
 
-    provider_details = Enum.map(stats, fn {provider, data} ->
-      %{
-        provider: provider,
-        requests_total: data[:requests_total] || 0,
-        requests_completed: data[:requests_completed] || 0,
-        requests_failed: data[:requests_failed] || 0,
-        total_tokens: data[:total_tokens] || 0,
-        average_duration_ms: data[:average_duration] || 0,
-        error_rate: calculate_error_rate(data),
-        last_used: data[:last_used]
-      }
-    end)
+    provider_details =
+      Enum.map(stats, fn {provider, data} ->
+        %{
+          provider: provider,
+          requests_total: data[:requests_total] || 0,
+          requests_completed: data[:requests_completed] || 0,
+          requests_failed: data[:requests_failed] || 0,
+          total_tokens: data[:total_tokens] || 0,
+          average_duration_ms: data[:average_duration] || 0,
+          error_rate: calculate_error_rate(data),
+          last_used: data[:last_used]
+        }
+      end)
 
     json(conn, %{
       providers: provider_details,
       summary: %{
         total_providers: length(provider_details),
-        active_providers: Enum.count(provider_details, & &1.requests_total > 0)
+        active_providers: Enum.count(provider_details, &(&1.requests_total > 0))
       }
     })
   end
@@ -132,8 +151,8 @@ defmodule CortexCommunityWeb.StatsController do
   # Private functions
 
   defp format_uptime(seconds) do
-    days = div(seconds, 86400)
-    hours = div(rem(seconds, 86400), 3600)
+    days = div(seconds, 86_400)
+    hours = div(rem(seconds, 86_400), 3600)
     minutes = div(rem(seconds, 3600), 60)
 
     parts = []
@@ -145,8 +164,10 @@ defmodule CortexCommunityWeb.StatsController do
   end
 
   defp calculate_error_rate(%{requests_total: 0}), do: 0.0
+
   defp calculate_error_rate(%{requests_total: total, requests_failed: failed}) do
     Float.round(failed / total * 100, 2)
   end
+
   defp calculate_error_rate(_), do: 0.0
 end

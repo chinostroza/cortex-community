@@ -1,0 +1,28 @@
+{
+  "coverage_options": {
+    "minimum_coverage": 80,
+    "treat_no_relevant_lines_as_covered": true
+  },
+  "skip_files": [
+    "lib/cortex_community/auth/",
+    "lib/cortex_community/clients/",
+    "lib/cortex_community/cli/",
+    "lib/cortex_community/application.ex",
+    "lib/cortex_community/repo.ex",
+    "lib/cortex_community/credentials.ex",
+    "lib/cortex_community/users.ex",
+    "lib/cortex_community/cortex_user.ex",
+    "lib/cortex_community/cortex_api_key.ex",
+    "lib/cortex_community/user_credential.ex",
+    "lib/cortex_community/users_behaviour.ex",
+    "lib/mix/",
+    "lib/cortex_community_web/components/",
+    "lib/cortex_community_web/endpoint.ex",
+    "lib/cortex_community_web/telemetry.ex",
+    "lib/cortex_community_web/gettext.ex",
+    "lib/cortex_community_web.ex",
+    "lib/cortex_community_web/controllers/page_html.ex",
+    "lib/cortex_community_web/controllers/error_html.ex",
+    "lib/cortex_community_web/controllers/error_json.ex"
+  ]
+}

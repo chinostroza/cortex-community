@@ -164,22 +164,28 @@ defmodule CortexCommunityWeb.PageController do
   end
 
   defp render_workers(workers, health) do
-    workers
-    |> Enum.map(fn worker ->
+    Enum.map_join(workers, "", fn worker ->
       status = Map.get(health, worker.name, :unknown)
       status_class = if status == :available, do: "status-available", else: "status-unavailable"
       status_text = status |> to_string() |> String.upcase()
+      name = worker.name |> to_string() |> html_escape()
+      type = worker.type |> to_string() |> html_escape()
 
       """
       <div class="worker-item">
         <div>
-          <strong>#{worker.name}</strong>
-          <span style="color: #666; margin-left: 1rem;">#{worker.type}</span>
+          <strong>#{name}</strong>
+          <span style="color: #666; margin-left: 1rem;">#{type}</span>
         </div>
         <span class="status-badge #{status_class}">#{status_text}</span>
       </div>
       """
     end)
-    |> Enum.join("")
+  end
+
+  defp html_escape(str) do
+    str
+    |> Phoenix.HTML.html_escape()
+    |> Phoenix.HTML.safe_to_string()
   end
 end

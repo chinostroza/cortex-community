@@ -22,13 +22,13 @@ defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
   import Plug.Conn
   require Logger
 
-  alias CortexCommunity.Users
+  @users Application.compile_env(:cortex_community, :users_module, CortexCommunity.Users)
 
   def init(opts), do: opts
 
   def call(conn, _opts) do
     with {:ok, api_key} <- extract_api_key(conn),
-         {:ok, user} <- Users.authenticate_by_api_key(api_key) do
+         {:ok, user} <- @users.authenticate_by_api_key(api_key) do
       # Authentication successful
       conn
       |> assign(:cortex_user, user)
@@ -37,10 +37,13 @@ defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
       {:error, :missing_authorization} ->
         conn
         |> put_resp_content_type("application/json")
-        |> send_resp(401, Jason.encode!(%{
-          error: "unauthorized",
-          message: "Missing Authorization header. Use: Bearer ctx_..."
-        }))
+        |> send_resp(
+          401,
+          Jason.encode!(%{
+            error: "unauthorized",
+            message: "Missing Authorization header. Use: Bearer ctx_..."
+          })
+        )
         |> halt()
 
       {:error, reason} ->
@@ -49,10 +52,13 @@ defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
 
         conn
         |> put_resp_content_type("application/json")
-        |> send_resp(401, Jason.encode!(%{
-          error: "unauthorized",
-          message: format_error_message(reason)
-        }))
+        |> send_resp(
+          401,
+          Jason.encode!(%{
+            error: "unauthorized",
+            message: format_error_message(reason)
+          })
+        )
         |> halt()
     end
   end
@@ -76,6 +82,7 @@ defmodule CortexCommunityWeb.Plugs.AuthenticateApiKey do
 
   defp format_error_message(:invalid_api_key), do: "Invalid API key"
   defp format_error_message(:expired_api_key), do: "API key has expired"
-  defp format_error_message(:invalid_authorization_format), do: "Invalid authorization header format"
-  defp format_error_message(_), do: "Authentication failed"
+
+  defp format_error_message(:invalid_authorization_format),
+    do: "Invalid authorization header format"
 end

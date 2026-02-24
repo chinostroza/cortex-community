@@ -29,15 +29,15 @@ defmodule CortexCommunity.Clients.ClaudeWebClient do
   def chat(messages, credentials, opts \\ []) do
     access_token = Map.get(credentials, :access_token) || credentials["access_token"]
 
-    if !access_token do
-      {:error, :missing_access_token}
-    else
+    if access_token do
       do_chat(messages, access_token, opts)
+    else
+      {:error, :missing_access_token}
     end
   end
 
   defp do_chat(_messages, _access_token, opts) do
-    # TODO: Update with actual endpoint from mitmproxy capture
+    # Update with actual endpoint from mitmproxy capture
     # Expected format based on research:
     # POST https://claude.ai/api/organizations/{org_id}/chat_conversations/{conversation_id}/completion
 
@@ -61,18 +61,9 @@ defmodule CortexCommunity.Clients.ClaudeWebClient do
     case HTTPoison.get(url, headers, recv_timeout: 10_000) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
         case Jason.decode(body) do
-          {:ok, orgs} when is_list(orgs) ->
-            # Get the first organization's UUID
-            case List.first(orgs) do
-              %{"uuid" => org_id} -> {:ok, org_id}
-              _ -> {:error, :no_organization_found}
-            end
-
-          {:ok, %{"uuid" => org_id}} ->
-            {:ok, org_id}
-
-          _ ->
-            {:error, :invalid_response}
+          {:ok, orgs} when is_list(orgs) -> extract_org_id(orgs)
+          {:ok, %{"uuid" => org_id}} -> {:ok, org_id}
+          _ -> {:error, :invalid_response}
         end
 
       {:ok, %HTTPoison.Response{status_code: status}} ->
@@ -82,6 +73,10 @@ defmodule CortexCommunity.Clients.ClaudeWebClient do
         {:error, {:request_failed, reason}}
     end
   end
+
+  defp extract_org_id([%{"uuid" => org_id} | _]), do: {:ok, org_id}
+  defp extract_org_id([_ | _]), do: {:error, :no_organization_found}
+  defp extract_org_id([]), do: {:error, :no_organization_found}
 
   defp build_headers(access_token) do
     [

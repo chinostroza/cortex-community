@@ -16,8 +16,8 @@ defmodule Mix.Tasks.Cortex.Setup do
 
   @shortdoc "Interactive setup wizard for Cortex"
 
-  alias CortexCommunity.CLI.Prompter
   alias CortexCommunity.Auth.ClaudeCliReader
+  alias CortexCommunity.CLI.Prompter
   alias CortexCommunity.Credentials
   alias CortexCommunity.Users
 
@@ -32,7 +32,14 @@ defmodule Mix.Tasks.Cortex.Setup do
 
     IO.puts("\n")
     IO.puts(IO.ANSI.cyan() <> "╔═══════════════════════════════════════╗" <> IO.ANSI.reset())
-    IO.puts(IO.ANSI.cyan() <> "║   " <> IO.ANSI.white() <> "Cortex Community Setup Wizard" <> IO.ANSI.cyan() <> "    ║" <> IO.ANSI.reset())
+
+    IO.puts(
+      IO.ANSI.cyan() <>
+        "║   " <>
+        IO.ANSI.white() <>
+        "Cortex Community Setup Wizard" <> IO.ANSI.cyan() <> "    ║" <> IO.ANSI.reset()
+    )
+
     IO.puts(IO.ANSI.cyan() <> "╚═══════════════════════════════════════╝" <> IO.ANSI.reset())
     IO.puts("\n")
 
@@ -44,23 +51,26 @@ defmodule Mix.Tasks.Cortex.Setup do
   end
 
   defp parse_args(args) do
-    {opts, _, _} = OptionParser.parse(args,
-      switches: [provider: :string],
-      aliases: [p: :provider]
-    )
+    {opts, _, _} =
+      OptionParser.parse(args,
+        switches: [provider: :string],
+        aliases: [p: :provider]
+      )
+
     opts
   end
 
   defp interactive_setup do
     IO.puts("Welcome to Cortex! Let's get you set up.\n")
 
-    mode = Prompter.select(
-      "Setup mode:",
-      [
-        {"QuickStart (Recommended)", :quickstart},
-        {"Manual Configuration", :manual}
-      ]
-    )
+    mode =
+      Prompter.select(
+        "Setup mode:",
+        [
+          {"QuickStart (Recommended)", :quickstart},
+          {"Manual Configuration", :manual}
+        ]
+      )
 
     case mode do
       :quickstart -> quickstart_flow()
@@ -72,17 +82,18 @@ defmodule Mix.Tasks.Cortex.Setup do
     IO.puts(IO.ANSI.green() <> "\n✓ QuickStart selected" <> IO.ANSI.reset())
     IO.puts("We'll configure the essentials and you can customize later.\n")
 
-    provider = Prompter.select(
-      "Select your primary AI provider:",
-      [
-        {"Anthropic (Claude Code CLI) - Reuses existing Claude Code auth", :anthropic_cli},
-        {"Anthropic (API Key)", :anthropic_api},
-        {"OpenAI", :openai},
-        {"Google Gemini", :google},
-        {"Groq", :groq},
-        {"Skip for now", :skip}
-      ]
-    )
+    provider =
+      Prompter.select(
+        "Select your primary AI provider:",
+        [
+          {"Anthropic (Claude Code CLI) - Reuses existing Claude Code auth", :anthropic_cli},
+          {"Anthropic (API Key)", :anthropic_api},
+          {"OpenAI", :openai},
+          {"Google Gemini", :google},
+          {"Groq", :groq},
+          {"Skip for now", :skip}
+        ]
+      )
 
     case provider do
       :anthropic_cli -> setup_anthropic_cli()
@@ -126,7 +137,9 @@ defmodule Mix.Tasks.Cortex.Setup do
         end
 
       {:error, reason} ->
-        IO.puts(IO.ANSI.red() <> "✗ Error reading credentials: #{inspect(reason)}" <> IO.ANSI.reset())
+        IO.puts(
+          IO.ANSI.red() <> "✗ Error reading credentials: #{inspect(reason)}" <> IO.ANSI.reset()
+        )
     end
   end
 
@@ -141,6 +154,7 @@ defmodule Mix.Tasks.Cortex.Setup do
       IO.puts(IO.ANSI.green() <> "✓ API key saved!" <> IO.ANSI.reset())
     else
       IO.puts(IO.ANSI.yellow() <> "⚠ API key format looks incorrect" <> IO.ANSI.reset())
+
       if Prompter.confirm("Save anyway?") do
         save_credentials("anthropic_api", %{api_key: api_key})
       end
@@ -193,7 +207,7 @@ defmodule Mix.Tasks.Cortex.Setup do
 
       {:error, changeset} ->
         IO.puts(IO.ANSI.red() <> "\n✗ Error saving credentials:" <> IO.ANSI.reset())
-        IO.inspect(changeset.errors)
+        IO.puts(inspect(changeset.errors))
     end
   end
 
@@ -232,7 +246,13 @@ defmodule Mix.Tasks.Cortex.Setup do
       api_key ->
         IO.puts("\n" <> IO.ANSI.cyan() <> "Your Cortex API Key:" <> IO.ANSI.reset())
         IO.puts(IO.ANSI.white() <> IO.ANSI.bright() <> "  #{api_key}" <> IO.ANSI.reset())
-        IO.puts("\n" <> IO.ANSI.yellow() <> "⚠ Save this key somewhere safe - you won't see it again!" <> IO.ANSI.reset())
+
+        IO.puts(
+          "\n" <>
+            IO.ANSI.yellow() <>
+            "⚠ Save this key somewhere safe - you won't see it again!" <> IO.ANSI.reset()
+        )
+
         IO.puts("\nUse this key in your client applications (like Allisbox):")
         IO.puts("  Authorization: Bearer #{api_key}")
     end
@@ -258,5 +278,4 @@ defmodule Mix.Tasks.Cortex.Setup do
     DateTime.from_unix!(unix_ms, :millisecond)
     |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
   end
-  defp format_timestamp(_), do: "Unknown"
 end

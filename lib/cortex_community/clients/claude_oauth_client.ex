@@ -30,15 +30,14 @@ defmodule CortexCommunity.Clients.ClaudeOAuthClient do
   def chat(messages, credentials, opts \\ []) do
     access_token = Map.get(credentials, :access_token) || credentials["access_token"]
 
-    if !access_token do
-      {:error, :missing_access_token}
-    else
+    if access_token do
       do_chat(messages, access_token, opts)
+    else
+      {:error, :missing_access_token}
     end
   end
 
   defp do_chat(messages, access_token, opts) do
-
     # Build request parameters
     # Note: OAuth tokens use different model names than API keys
     model = Keyword.get(opts, :model, "claude-sonnet-4-5-20250929")
@@ -77,9 +76,11 @@ defmodule CortexCommunity.Clients.ClaudeOAuthClient do
         # For streaming, make_request already returns a Stream
         # For non-streaming, it returns the response body as a string
         if stream do
-          {:ok, response}  # Already a Stream from create_stream/1
+          # Already a Stream from create_stream/1
+          {:ok, response}
         else
-          {:ok, parse_response(response)}  # Parse the full response
+          # Parse the full response
+          {:ok, parse_response(response)}
         end
 
       {:error, reason} ->
@@ -122,10 +123,11 @@ defmodule CortexCommunity.Clients.ClaudeOAuthClient do
     user_messages = Enum.reject(messages, fn msg -> msg.role == "system" end)
 
     # Combine all system message content into one string
-    system_content = case system_messages do
-      [] -> nil
-      msgs -> Enum.map_join(msgs, "\n\n", fn msg -> msg.content end)
-    end
+    system_content =
+      case system_messages do
+        [] -> nil
+        msgs -> Enum.map_join(msgs, "\n\n", fn msg -> msg.content end)
+      end
 
     {system_content, user_messages}
   end
@@ -135,7 +137,11 @@ defmodule CortexCommunity.Clients.ClaudeOAuthClient do
 
     if stream do
       # For streaming, use async request
-      case HTTPoison.post(url, json_body, headers, stream_to: self(), async: :once, recv_timeout: 60_000) do
+      case HTTPoison.post(url, json_body, headers,
+             stream_to: self(),
+             async: :once,
+             recv_timeout: 60_000
+           ) do
         {:ok, %HTTPoison.AsyncResponse{} = async_response} ->
           {:ok, create_stream(async_response)}
 
@@ -192,31 +198,36 @@ defmodule CortexCommunity.Clients.ClaudeOAuthClient do
             {events, remaining} = extract_sse_events(new_buffer)
 
             # Parse events and extract text chunks
-            text_chunks = Enum.flat_map(events, fn event ->
-              case parse_sse_event(event) do
-                {_type, %{"type" => "content_block_delta", "delta" => %{"text" => text}}} ->
-                  [text]
-                {_type, %{"delta" => %{"text" => text}}} ->
-                  [text]
-                {_type, %{"type" => "error"} = error_data} ->
-                  Logger.error("Claude API error in stream: #{inspect(error_data)}")
-                  []
-                {_type, data} when is_map(data) ->
-                  # Log any unexpected data for debugging
-                  if Map.has_key?(data, "error") do
-                    Logger.error("Error in SSE event: #{inspect(data)}")
-                  end
-                  []
-                _ ->
-                  []
-              end
-            end)
+            text_chunks =
+              Enum.flat_map(events, fn event ->
+                case parse_sse_event(event) do
+                  {_type, %{"type" => "content_block_delta", "delta" => %{"text" => text}}} ->
+                    [text]
+
+                  {_type, %{"delta" => %{"text" => text}}} ->
+                    [text]
+
+                  {_type, %{"type" => "error"} = error_data} ->
+                    Logger.error("Claude API error in stream: #{inspect(error_data)}")
+                    []
+
+                  {_type, data} when is_map(data) ->
+                    # Log any unexpected data for debugging
+                    if Map.has_key?(data, "error") do
+                      Logger.error("Error in SSE event: #{inspect(data)}")
+                    end
+
+                    []
+
+                  _ ->
+                    []
+                end
+              end)
 
             {text_chunks, {async_resp, remaining}}
 
           %HTTPoison.AsyncEnd{} ->
             {:halt, {async_resp, buffer}}
-
         after
           30_000 -> {:halt, {async_resp, buffer}}
         end
@@ -230,13 +241,18 @@ defmodule CortexCommunity.Clients.ClaudeOAuthClient do
     parts = String.split(buffer, "\n\n")
 
     # Last part might be incomplete, keep it in buffer
-    {complete_events, remaining} = case parts do
-      [] -> {[], ""}
-      [single] -> {[], single}
-      multiple ->
-        # Get all parts except the last one
-        {Enum.drop(multiple, -1), List.last(multiple)}
-    end
+    {complete_events, remaining} =
+      case parts do
+        [] ->
+          {[], ""}
+
+        [single] ->
+          {[], single}
+
+        multiple ->
+          # Get all parts except the last one
+          {Enum.drop(multiple, -1), List.last(multiple)}
+      end
 
     {complete_events |> Enum.reject(&(&1 == "")), remaining}
   end
@@ -247,33 +263,39 @@ defmodule CortexCommunity.Clients.ClaudeOAuthClient do
     # data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}
     lines = String.split(event_text, "\n")
 
-    event_type = Enum.find_value(lines, fn line ->
-      if String.starts_with?(line, "event:") do
-        line |> String.replace_prefix("event:", "") |> String.trim()
-      end
-    end)
-
-    data = Enum.find_value(lines, fn line ->
-      if String.starts_with?(line, "data:") do
-        json = line |> String.replace_prefix("data:", "") |> String.trim()
-        case Jason.decode(json) do
-          {:ok, decoded} -> decoded
-          _ -> nil
+    event_type =
+      Enum.find_value(lines, fn line ->
+        if String.starts_with?(line, "event:") do
+          line |> String.replace_prefix("event:", "") |> String.trim()
         end
-      end
-    end)
+      end)
+
+    data = Enum.find_value(lines, &decode_sse_data_line/1)
 
     if data, do: {event_type, data}, else: nil
+  end
+
+  defp decode_sse_data_line(line) do
+    if String.starts_with?(line, "data:") do
+      json = line |> String.replace_prefix("data:", "") |> String.trim()
+
+      case Jason.decode(json) do
+        {:ok, decoded} -> decoded
+        _ -> nil
+      end
+    end
   end
 
   defp parse_response(body) when is_binary(body) do
     case Jason.decode(body) do
       {:ok, %{"content" => content}} ->
         # Extract text from content blocks
-        text = Enum.map_join(content, "", fn
-          %{"text" => text} -> text
-          _ -> ""
-        end)
+        text =
+          Enum.map_join(content, "", fn
+            %{"text" => text} -> text
+            _ -> ""
+          end)
+
         [text]
 
       {:ok, data} ->

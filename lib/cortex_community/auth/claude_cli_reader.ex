@@ -48,35 +48,38 @@ defmodule CortexCommunity.Auth.ClaudeCliReader do
   Reads credentials from macOS Keychain using the `security` command.
   """
   def read_from_keychain do
-    try do
-      # Execute security command to read from Keychain
-      {json_output, 0} = System.cmd(
+    # Execute security command to read from Keychain
+    {json_output, 0} =
+      System.cmd(
         "security",
         [
           "find-generic-password",
-          "-s", @keychain_service,
-          "-a", keychain_account(),
-          "-w"  # Output password only
+          "-s",
+          @keychain_service,
+          "-a",
+          keychain_account(),
+          # Output password only
+          "-w"
         ],
         stderr_to_stdout: true
       )
 
-      json_output
-      |> String.trim()
-      |> Jason.decode!()
-      |> parse_claude_oauth()
-      |> case do
-        {:ok, creds} ->
-          Logger.debug("Read Claude CLI credentials from Keychain")
-          {:ok, creds}
-        error ->
-          error
-      end
-    rescue
+    json_output
+    |> String.trim()
+    |> Jason.decode!()
+    |> parse_claude_oauth()
+    |> case do
+      {:ok, creds} ->
+        Logger.debug("Read Claude CLI credentials from Keychain")
+        {:ok, creds}
+
       error ->
-        Logger.debug("Could not read from Keychain: #{inspect(error)}")
-        nil
+        error
     end
+  rescue
+    error ->
+      Logger.debug("Could not read from Keychain: #{inspect(error)}")
+      nil
   end
 
   @doc """
@@ -95,6 +98,7 @@ defmodule CortexCommunity.Auth.ClaudeCliReader do
           {:ok, creds} ->
             Logger.debug("Read Claude CLI credentials from file")
             {:ok, creds}
+
           error ->
             error
         end
@@ -113,13 +117,12 @@ defmodule CortexCommunity.Auth.ClaudeCliReader do
   defp parse_claude_oauth(%{"claudeAiOauth" => oauth}) when is_map(oauth) do
     with {:ok, access_token} <- get_string(oauth, "accessToken"),
          {:ok, expires_at} <- get_integer(oauth, "expiresAt") do
-
       refresh_token = get_string(oauth, "refreshToken") |> elem(1)
 
       subscription_type = Map.get(oauth, "subscriptionType")
 
       credentials = %{
-        type: if(refresh_token, do: :oauth, else: :token),
+        type: if(is_binary(refresh_token), do: :oauth, else: :token),
         provider: :anthropic,
         access_token: access_token,
         refresh_token: refresh_token,

@@ -55,10 +55,11 @@ defmodule CortexCommunity.Credentials do
   def get_credentials(user_id, provider) do
     credential =
       Repo.one(
-        from c in UserCredential,
-        where: c.user_id == ^user_id and c.provider == ^provider and c.is_active == true,
-        order_by: [desc: c.inserted_at],
-        limit: 1
+        from(c in UserCredential,
+          where: c.user_id == ^user_id and c.provider == ^provider and c.is_active == true,
+          order_by: [desc: c.inserted_at],
+          limit: 1
+        )
       )
 
     case credential do
@@ -110,6 +111,7 @@ defmodule CortexCommunity.Credentials do
   defp extract_expiry(%{expires: expires}) when is_integer(expires) do
     DateTime.from_unix!(expires, :millisecond)
   end
+
   defp extract_expiry(_), do: nil
 
   @aad "cortex_credentials_v1"
@@ -118,8 +120,8 @@ defmodule CortexCommunity.Credentials do
     secret =
       (Application.get_env(:cortex_community, CortexCommunityWeb.Endpoint) || [])
       |> Keyword.get(:secret_key_base) ||
-      System.get_env("SECRET_KEY_BASE") ||
-      raise "SECRET_KEY_BASE not configured — cannot encrypt credentials"
+        System.get_env("SECRET_KEY_BASE") ||
+        raise "SECRET_KEY_BASE not configured — cannot encrypt credentials"
 
     :crypto.mac(:hmac, :sha256, secret, "cortex_credentials_encryption_key")
   end
@@ -129,9 +131,15 @@ defmodule CortexCommunity.Credentials do
     key = encryption_key()
     iv = :crypto.strong_rand_bytes(12)
 
-    {ciphertext, tag} = :crypto.crypto_one_time_aead(
-      :aes_256_gcm, key, iv, plaintext, @aad, true
-    )
+    {ciphertext, tag} =
+      :crypto.crypto_one_time_aead(
+        :aes_256_gcm,
+        key,
+        iv,
+        plaintext,
+        @aad,
+        true
+      )
 
     # Encode as base64: iv(12) + tag(16) + ciphertext
     Base.encode64(iv <> tag <> ciphertext)
@@ -144,8 +152,14 @@ defmodule CortexCommunity.Credentials do
     <<iv::binary-12, tag::binary-16, ciphertext::binary>> = raw
 
     case :crypto.crypto_one_time_aead(
-      :aes_256_gcm, key, iv, ciphertext, @aad, tag, false
-    ) do
+           :aes_256_gcm,
+           key,
+           iv,
+           ciphertext,
+           @aad,
+           tag,
+           false
+         ) do
       plaintext when is_binary(plaintext) ->
         Jason.decode!(plaintext, keys: :atoms)
 

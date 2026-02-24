@@ -8,7 +8,8 @@ defmodule CortexCommunity.StatsCollector do
   use GenServer
   require Logger
 
-  @stats_reset_interval :timer.hours(24)  # Reset daily to prevent memory bloat
+  # Reset daily to prevent memory bloat
+  @stats_reset_interval :timer.hours(24)
 
   defstruct [
     :started_at,
@@ -99,108 +100,115 @@ defmodule CortexCommunity.StatsCollector do
 
   @impl true
   def handle_cast({:track_request, event, metadata}, state) do
-    new_state = case event do
-      :started ->
-        %{state |
-          requests_total: state.requests_total + 1,
-          requests_active: state.requests_active + 1
-        }
-        |> update_hourly(:requests)
+    new_state =
+      case event do
+        :started ->
+          %{
+            state
+            | requests_total: state.requests_total + 1,
+              requests_active: state.requests_active + 1
+          }
+          |> update_hourly(:requests)
 
-      :completed ->
-        duration = Map.get(metadata, :duration, 0)
-        tokens = Map.get(metadata, :tokens, 0)
+        :completed ->
+          duration = Map.get(metadata, :duration, 0)
+          tokens = Map.get(metadata, :tokens, 0)
 
-        %{state |
-          requests_completed: state.requests_completed + 1,
-          requests_active: max(0, state.requests_active - 1),
-          total_duration: state.total_duration + duration,
-          total_tokens: state.total_tokens + tokens
-        }
-        |> update_hourly(:completed)
+          %{
+            state
+            | requests_completed: state.requests_completed + 1,
+              requests_active: max(0, state.requests_active - 1),
+              total_duration: state.total_duration + duration,
+              total_tokens: state.total_tokens + tokens
+          }
+          |> update_hourly(:completed)
 
-      :failed ->
-        %{state |
-          requests_failed: state.requests_failed + 1,
-          requests_active: max(0, state.requests_active - 1)
-        }
-        |> update_hourly(:failed)
+        :failed ->
+          %{
+            state
+            | requests_failed: state.requests_failed + 1,
+              requests_active: max(0, state.requests_active - 1)
+          }
+          |> update_hourly(:failed)
 
-      :no_workers ->
-        %{state |
-          requests_no_workers: state.requests_no_workers + 1,
-          requests_failed: state.requests_failed + 1
-        }
+        :no_workers ->
+          %{
+            state
+            | requests_no_workers: state.requests_no_workers + 1,
+              requests_failed: state.requests_failed + 1
+          }
 
-      :error ->
-        %{state |
-          requests_failed: state.requests_failed + 1,
-          requests_active: max(0, state.requests_active - 1)
-        }
+        :error ->
+          %{
+            state
+            | requests_failed: state.requests_failed + 1,
+              requests_active: max(0, state.requests_active - 1)
+          }
 
-      _ ->
-        state
-    end
+        _ ->
+          state
+      end
 
     {:noreply, new_state}
   end
 
   @impl true
   def handle_cast({:track_provider, provider, event, metadata}, state) do
-    provider_data = Map.get(state.provider_stats, provider, %{
-      requests_total: 0,
-      requests_completed: 0,
-      requests_failed: 0,
-      total_duration: 0,
-      total_tokens: 0,
-      last_used: nil
-    })
+    provider_data =
+      Map.get(state.provider_stats, provider, %{
+        requests_total: 0,
+        requests_completed: 0,
+        requests_failed: 0,
+        total_duration: 0,
+        total_tokens: 0,
+        last_used: nil
+      })
 
-    updated_data = case event do
-      :request ->
-        %{provider_data |
-          requests_total: provider_data.requests_total + 1,
-          last_used: DateTime.utc_now()
-        }
+    updated_data =
+      case event do
+        :request ->
+          %{
+            provider_data
+            | requests_total: provider_data.requests_total + 1,
+              last_used: DateTime.utc_now()
+          }
 
-      :completed ->
-        duration = Map.get(metadata, :duration, 0)
-        tokens = Map.get(metadata, :tokens, 0)
+        :completed ->
+          duration = Map.get(metadata, :duration, 0)
+          tokens = Map.get(metadata, :tokens, 0)
 
-        %{provider_data |
-          requests_completed: provider_data.requests_completed + 1,
-          total_duration: provider_data.total_duration + duration,
-          total_tokens: provider_data.total_tokens + tokens
-        }
+          %{
+            provider_data
+            | requests_completed: provider_data.requests_completed + 1,
+              total_duration: provider_data.total_duration + duration,
+              total_tokens: provider_data.total_tokens + tokens
+          }
 
-      :failed ->
-        %{provider_data |
-          requests_failed: provider_data.requests_failed + 1
-        }
+        :failed ->
+          %{provider_data | requests_failed: provider_data.requests_failed + 1}
 
-      _ ->
-        provider_data
-    end
+        _ ->
+          provider_data
+      end
 
-    new_state = %{state |
-      provider_stats: Map.put(state.provider_stats, provider, updated_data)
-    }
+    new_state = %{state | provider_stats: Map.put(state.provider_stats, provider, updated_data)}
 
     {:noreply, new_state}
   end
 
   @impl true
   def handle_cast(:reset_stats, state) do
-    new_state = %{state |
-      requests_total: 0,
-      requests_completed: 0,
-      requests_failed: 0,
-      requests_no_workers: 0,
-      requests_active: 0,
-      total_duration: 0,
-      total_tokens: 0,
-      provider_stats: %{},
-      hourly_stats: initialize_hourly_stats()
+    new_state = %{
+      state
+      | requests_total: 0,
+        requests_completed: 0,
+        requests_failed: 0,
+        requests_no_workers: 0,
+        requests_active: 0,
+        total_duration: 0,
+        total_tokens: 0,
+        provider_stats: %{},
+        hourly_stats: initialize_hourly_stats()
     }
 
     Logger.info("Stats reset completed")
@@ -211,17 +219,19 @@ defmodule CortexCommunity.StatsCollector do
   def handle_call(:get_stats, _from, state) do
     uptime = System.monotonic_time(:second) - state.started_at
 
-    avg_duration = if state.requests_completed > 0 do
-      div(state.total_duration, state.requests_completed)
-    else
-      0
-    end
+    avg_duration =
+      if state.requests_completed > 0 do
+        div(state.total_duration, state.requests_completed)
+      else
+        0
+      end
 
-    tokens_per_second = if uptime > 0 do
-      Float.round(state.total_tokens / uptime, 2)
-    else
-      0.0
-    end
+    tokens_per_second =
+      if uptime > 0 do
+        Float.round(state.total_tokens / uptime, 2)
+      else
+        0.0
+      end
 
     stats = %{
       uptime_seconds: uptime,
@@ -242,16 +252,18 @@ defmodule CortexCommunity.StatsCollector do
 
   @impl true
   def handle_call(:get_provider_stats, _from, state) do
-    provider_stats = Enum.map(state.provider_stats, fn {provider, data} ->
-      avg_duration = if data.requests_completed > 0 do
-        div(data.total_duration, data.requests_completed)
-      else
-        0
-      end
+    provider_stats =
+      Enum.map(state.provider_stats, fn {provider, data} ->
+        avg_duration =
+          if data.requests_completed > 0 do
+            div(data.total_duration, data.requests_completed)
+          else
+            0
+          end
 
-      {provider, Map.put(data, :average_duration, avg_duration)}
-    end)
-    |> Enum.into(%{})
+        {provider, Map.put(data, :average_duration, avg_duration)}
+      end)
+      |> Enum.into(%{})
 
     {:reply, provider_stats, state}
   end
@@ -266,14 +278,15 @@ defmodule CortexCommunity.StatsCollector do
     # Keep some historical data but reset counters
     Logger.info("Performing daily stats reset")
 
-    new_state = %{state |
-      requests_total: 0,
-      requests_completed: 0,
-      requests_failed: 0,
-      requests_no_workers: 0,
-      total_duration: 0,
-      total_tokens: 0,
-      hourly_stats: initialize_hourly_stats()
+    new_state = %{
+      state
+      | requests_total: 0,
+        requests_completed: 0,
+        requests_failed: 0,
+        requests_no_workers: 0,
+        total_duration: 0,
+        total_tokens: 0,
+        hourly_stats: initialize_hourly_stats()
     }
 
     # Schedule next reset
@@ -318,22 +331,24 @@ defmodule CortexCommunity.StatsCollector do
     hour = DateTime.utc_now().hour
     hourly = Map.get(state.hourly_stats, hour, %{requests: 0, completed: 0, failed: 0, tokens: 0})
 
-    updated_hourly = case metric do
-      :requests -> %{hourly | requests: hourly.requests + 1}
-      :completed -> %{hourly | completed: hourly.completed + 1}
-      :failed -> %{hourly | failed: hourly.failed + 1}
-      _ -> hourly
-    end
+    updated_hourly =
+      case metric do
+        :requests -> %{hourly | requests: hourly.requests + 1}
+        :completed -> %{hourly | completed: hourly.completed + 1}
+        :failed -> %{hourly | failed: hourly.failed + 1}
+      end
 
     %{state | hourly_stats: Map.put(state.hourly_stats, hour, updated_hourly)}
   end
 
   defp calculate_success_rate(%{requests_total: 0}), do: 100.0
+
   defp calculate_success_rate(%{requests_total: total, requests_completed: completed}) do
     Float.round(completed / total * 100, 2)
   end
 
   defp calculate_error_rate(%{requests_total: 0}), do: 0.0
+
   defp calculate_error_rate(%{requests_total: total, requests_failed: failed}) do
     Float.round(failed / total * 100, 2)
   end

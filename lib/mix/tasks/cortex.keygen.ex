@@ -55,7 +55,7 @@ defmodule Mix.Tasks.Cortex.Keygen do
 
       {:error, changeset} ->
         IO.puts("\n❌ Error generando la key:")
-        IO.inspect(changeset.errors)
+        IO.puts(inspect(changeset.errors))
     end
   end
 end

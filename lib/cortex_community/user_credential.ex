@@ -16,14 +16,16 @@ defmodule CortexCommunity.UserCredential do
   @foreign_key_type :binary_id
 
   schema "user_credentials" do
-    field :provider, :string  # "anthropic_cli", "anthropic_api", "openai", etc.
-    field :auth_type, :string  # "oauth", "api_key", "token"
-    field :encrypted_data, :binary
-    field :expires_at, :utc_datetime
-    field :last_used_at, :utc_datetime
-    field :is_active, :boolean, default: true
+    # "anthropic_cli", "anthropic_api", "openai", etc.
+    field(:provider, :string)
+    # "oauth", "api_key", "token"
+    field(:auth_type, :string)
+    field(:encrypted_data, :binary)
+    field(:expires_at, :utc_datetime)
+    field(:last_used_at, :utc_datetime)
+    field(:is_active, :boolean, default: true)
 
-    belongs_to :user, CortexCommunity.CortexUser, foreign_key: :user_id, type: :binary_id
+    belongs_to(:user, CortexCommunity.CortexUser, foreign_key: :user_id, type: :binary_id)
 
     timestamps(type: :utc_datetime)
   end
@@ -33,7 +35,15 @@ defmodule CortexCommunity.UserCredential do
   """
   def changeset(credential, attrs) do
     credential
-    |> cast(attrs, [:user_id, :provider, :auth_type, :encrypted_data, :expires_at, :is_active, :last_used_at])
+    |> cast(attrs, [
+      :user_id,
+      :provider,
+      :auth_type,
+      :encrypted_data,
+      :expires_at,
+      :is_active,
+      :last_used_at
+    ])
     |> validate_required([:user_id, :provider, :auth_type, :encrypted_data])
     |> foreign_key_constraint(:user_id)
     |> validate_inclusion(:provider, [
@@ -63,6 +73,7 @@ defmodule CortexCommunity.UserCredential do
   Checks if credentials are expired.
   """
   def expired?(%__MODULE__{expires_at: nil}), do: false
+
   def expired?(%__MODULE__{expires_at: expires_at}) do
     DateTime.compare(DateTime.utc_now(), expires_at) == :gt
   end

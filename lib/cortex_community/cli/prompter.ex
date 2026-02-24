@@ -56,7 +56,9 @@ defmodule CortexCommunity.CLI.Prompter do
     hint = if default, do: " (Y/n)", else: " (y/N)"
 
     response =
-      IO.gets("\n" <> IO.ANSI.white() <> message <> IO.ANSI.cyan() <> hint <> IO.ANSI.reset() <> " ")
+      IO.gets(
+        "\n" <> IO.ANSI.white() <> message <> IO.ANSI.cyan() <> hint <> IO.ANSI.reset() <> " "
+      )
       |> String.trim()
       |> String.downcase()
 
@@ -77,6 +79,7 @@ defmodule CortexCommunity.CLI.Prompter do
     if title do
       IO.puts("\n" <> IO.ANSI.cyan() <> "ℹ #{title}" <> IO.ANSI.reset())
     end
+
     IO.puts("  " <> message)
     IO.puts("")
   end
@@ -91,7 +94,11 @@ defmodule CortexCommunity.CLI.Prompter do
         num
 
       _ ->
-        IO.puts(IO.ANSI.red() <> "Invalid choice. Please enter a number between #{min} and #{max}." <> IO.ANSI.reset())
+        IO.puts(
+          IO.ANSI.red() <>
+            "Invalid choice. Please enter a number between #{min} and #{max}." <> IO.ANSI.reset()
+        )
+
         get_number_input(prompt, min, max)
     end
   end

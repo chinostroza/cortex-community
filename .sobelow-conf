@@ -1,0 +1,14 @@
+[
+  # Config.HTTPS: HTTPS is terminated at the reverse proxy (nginx) in production.
+  # The application itself runs on HTTP internally behind the proxy.
+  #
+  # Traversal.FileModule: File path in claude_cli_reader.ex comes from a fixed
+  # module attribute (@credentials_file_path), not user input.
+  #
+  # XSS.HTML: page_controller.ex interpolates only:
+  #   - Application.spec/2 (OTP app version, internal)
+  #   - Integer stats (requests_total, success_rate, counts — not XSS vectors)
+  #   - render_workers/2 output (worker.name and worker.type are HTML-escaped)
+  # All values are internal system data, not user-supplied input.
+  ignore: ["Config.HTTPS", "Traversal.FileModule", "XSS.HTML"]
+]

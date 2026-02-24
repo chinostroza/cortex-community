@@ -4,6 +4,7 @@ defmodule CortexCommunityWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+
     plug CORSPlug,
       origin: [
         "http://localhost",
@@ -19,6 +20,7 @@ defmodule CortexCommunityWeb.Router do
       ],
       methods: ["GET", "POST", "OPTIONS"],
       headers: ["Authorization", "Content-Type", "Accept"]
+
     plug CortexCommunityWeb.Plugs.RequestLogger
   end
 
@@ -28,7 +30,11 @@ defmodule CortexCommunityWeb.Router do
     plug :fetch_live_flash
     plug :put_root_layout, html: {CortexCommunityWeb.Layouts, :root}
     plug :protect_from_forgery
-    plug :put_secure_browser_headers
+
+    plug :put_secure_browser_headers, %{
+      "content-security-policy" =>
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
+    }
   end
 
   # API Routes
@@ -37,7 +43,8 @@ defmodule CortexCommunityWeb.Router do
 
     # Core chat endpoint
     post "/chat", ChatController, :create
-    post "/completions", ChatController, :create  # OpenAI compatible
+    # OpenAI compatible
+    post "/completions", ChatController, :create
 
     # Search endpoint
     post "/search", SearchController, :create

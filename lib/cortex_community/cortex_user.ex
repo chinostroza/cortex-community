@@ -10,16 +10,18 @@ defmodule CortexCommunity.CortexUser do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @type t :: %__MODULE__{}
+
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
 
   schema "cortex_users" do
-    field :username, :string
-    field :email, :string
-    field :name, :string
+    field(:username, :string)
+    field(:email, :string)
+    field(:name, :string)
 
-    has_many :api_keys, CortexCommunity.CortexApiKey, foreign_key: :user_id
-    has_many :credentials, CortexCommunity.UserCredential, foreign_key: :user_id
+    has_many(:api_keys, CortexCommunity.CortexApiKey, foreign_key: :user_id)
+    has_many(:credentials, CortexCommunity.UserCredential, foreign_key: :user_id)
 
     timestamps(type: :utc_datetime)
   end

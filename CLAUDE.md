@@ -101,3 +101,45 @@ Key environment variables:
    - Run `mix quality` before commits
    - Follow formatter rules in `.formatter.exs`
    - Credo enforces code standards
+   - Run `/certify-phoenix-api` skill after significant changes
+
+### Testing Workflow (TDD + Mox)
+
+**Stack**: Mox for mock-based unit tests, `mix coveralls` for coverage (minimum 80%)
+
+**Architecture**:
+- `CortexCore.Behaviour` (in cortex_core) + `CortexCore.Mock` — mocks all AI provider calls
+- `CortexCommunity.UsersBehaviour` + `CortexCommunity.Users.Mock` — mocks auth/user lookup
+- Module injection: `@cortex_core Application.compile_env(:cortex_community, :cortex_core, CortexCore)` — in all controllers and plugs
+- `test/support/conn_case.ex` exports `user_fixture/0` and `with_auth/1` helpers
+- `coveralls.json` excludes OAuth clients, Mix tasks, Ecto schemas, Phoenix boilerplate
+
+**Rules**:
+1. **401 tests** — no mock setup needed (auth fails before mock is called)
+2. **400/200 tests** — `stub(Users.Mock, :authenticate_by_api_key, ...)` in setup block
+3. **Behavior verification** — use `expect/3` (must be called once); use `stub/3` for setup
+4. Auth plug: `"Token xyz"` fails before DB; `"Bearer <anything>"` triggers Users.Mock lookup
+5. SSE error responses keep `text/event-stream` content-type — use `conn.resp_body` + `Jason.decode/1`
+6. `StatsCollector` tests: call `reset_stats()` in setup; GenServer.cast/call order guarantees consistency
+7. cortex_core tests live in `cortex-core/cortex_core/test/`; run from cortex_community with `mix compile` first
+
+**Coverage exclusions** (in `coveralls.json`): OAuth/CLI clients, Mix tasks, Ecto schemas, Phoenix boilerplate
+
+### Endpoint Map (all verified working)
+
+| Endpoint | Auth | Notes |
+|----------|------|-------|
+| `POST /api/chat` | ✅ | SSE streaming |
+| `POST /api/completions` | ✅ | OpenAI-compatible alias |
+| `POST /api/search` | ✅ | tavily-primary, pubmed-primary |
+| `POST /api/tools` | ✅ | function calling, requires explicit `provider` |
+| `GET /api/models` | ✅ | lists all workers |
+| `GET /api/health` | ❌ | public |
+| `GET /api/health/workers` | ❌ | public |
+| `GET /api/stats` | ❌ | public |
+
+| `GET /api/health/detailed` | ❌ | public |
+| `GET /api/stats/providers` | ❌ | public |
+| `GET /docs` | ❌ | public HTML |
+
+Groq tool calling: must specify `model: "llama-3.3-70b-versatile"` (default returns empty [])

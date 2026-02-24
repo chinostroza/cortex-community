@@ -2,6 +2,8 @@ defmodule CortexCommunityWeb.ToolsController do
   use CortexCommunityWeb, :controller
   require Logger
 
+  @cortex_core Application.compile_env(:cortex_community, :cortex_core, CortexCore)
+
   plug CortexCommunityWeb.Plugs.AuthenticateApiKey
 
   @doc """
@@ -20,9 +22,11 @@ defmodule CortexCommunityWeb.ToolsController do
       |> maybe_add_opt(:tool_choice, tool_choice)
       |> maybe_add_opt(:model, params["model"])
 
-    Logger.info("Tool use request: provider=#{provider}, tools=#{length(tools)}, messages=#{length(messages)}")
+    Logger.info(
+      "Tool use request: provider=#{provider}, tools=#{length(tools)}, messages=#{length(messages)}"
+    )
 
-    case CortexCore.call_with_tools(messages, tools, opts) do
+    case @cortex_core.call_with_tools(messages, tools, opts) do
       {:ok, tool_calls} ->
         json(conn, %{ok: true, tool_calls: tool_calls})
 

@@ -3,10 +3,12 @@ defmodule CortexCommunity.Users do
   Context module for managing Cortex users and API keys.
   """
 
+  @behaviour CortexCommunity.UsersBehaviour
+
   import Ecto.Query
-  alias CortexCommunity.Repo
-  alias CortexCommunity.CortexUser
   alias CortexCommunity.CortexApiKey
+  alias CortexCommunity.CortexUser
+  alias CortexCommunity.Repo
 
   # User operations
 
@@ -82,9 +84,10 @@ defmodule CortexCommunity.Users do
   """
   def authenticate_by_api_key(api_key_string) when is_binary(api_key_string) do
     query =
-      from k in CortexApiKey,
+      from(k in CortexApiKey,
         where: k.key == ^api_key_string and k.is_active == true,
         preload: [:user]
+      )
 
     case Repo.one(query) do
       nil ->
@@ -112,10 +115,11 @@ defmodule CortexCommunity.Users do
   """
   def get_or_create_api_key(user_id, attrs \\ %{}) do
     query =
-      from k in CortexApiKey,
+      from(k in CortexApiKey,
         where: k.user_id == ^user_id and k.is_active == true and is_nil(k.expires_at),
         order_by: [asc: k.inserted_at],
         limit: 1
+      )
 
     case Repo.one(query) do
       nil -> create_api_key(user_id, attrs)

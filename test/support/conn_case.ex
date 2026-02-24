@@ -28,10 +28,32 @@ defmodule CortexCommunityWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import CortexCommunityWeb.ConnCase
+      import Mox
     end
   end
 
   setup _tags do
+    Mox.verify_on_exit!()
     {:ok, conn: Phoenix.ConnTest.build_conn()}
+  end
+
+  @doc """
+  Returns a mock CortexUser struct for use in tests.
+  """
+  def user_fixture do
+    %CortexCommunity.CortexUser{
+      id: "00000000-0000-0000-0000-000000000001",
+      username: "testuser",
+      email: "test@example.com",
+      name: "Test User"
+    }
+  end
+
+  @doc """
+  Puts a Bearer token header on the conn. Pair with a Users.Mock stub
+  that returns {:ok, user_fixture()} for :authenticate_by_api_key.
+  """
+  def with_auth(conn) do
+    Plug.Conn.put_req_header(conn, "authorization", "Bearer test-api-token")
   end
 end

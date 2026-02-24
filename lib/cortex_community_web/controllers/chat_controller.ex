@@ -3,9 +3,11 @@ defmodule CortexCommunityWeb.ChatController do
   use CortexCommunityWeb, :controller
   require Logger
 
-  alias CortexCommunity.StatsCollector
-  alias CortexCommunity.Credentials
+  @cortex_core Application.compile_env(:cortex_community, :cortex_core, CortexCore)
+
   alias CortexCommunity.Clients.ClaudeOAuthClient
+  alias CortexCommunity.Credentials
+  alias CortexCommunity.StatsCollector
 
   # Authenticate API key and assign user to conn.assigns.cortex_user
   plug CortexCommunityWeb.Plugs.AuthenticateApiKey
@@ -24,13 +26,16 @@ defmodule CortexCommunityWeb.ChatController do
     cortex_user = Map.get(conn.assigns, :cortex_user)
 
     # Log request
-    Logger.info("Chat request: user=#{inspect(cortex_user && cortex_user.username)}, messages=#{length(messages)}")
+    Logger.info(
+      "Chat request: user=#{inspect(cortex_user && cortex_user.username)}, messages=#{length(messages)}"
+    )
 
     conn
     |> put_resp_header("content-type", "text/event-stream")
     |> put_resp_header("cache-control", "no-cache")
     |> put_resp_header("connection", "keep-alive")
-    |> put_resp_header("x-accel-buffering", "no")  # For nginx
+    # For nginx
+    |> put_resp_header("x-accel-buffering", "no")
     |> dispatch_and_stream(messages, opts, cortex_user, start_time)
   end
 
@@ -62,52 +67,59 @@ defmodule CortexCommunityWeb.ChatController do
         |> stream_response(stream, start_time)
 
       {:fallback, reason} ->
-        Logger.warning("⚠️  OAuth falló (#{reason}), usando credenciales del servidor (Gemini/Groq)")
+        Logger.warning(
+          "⚠️  OAuth falló (#{reason}), usando credenciales del servidor (Gemini/Groq)"
+        )
+
         dispatch_with_server_credentials(conn, messages, opts, start_time)
     end
   end
 
   # Try to use user's configured credentials
   defp try_user_credentials(%CortexCommunity.CortexUser{id: user_id} = user, messages, opts) do
-    provider = determine_provider(opts)
+    case determine_provider(opts) do
+      nil ->
+        # Non-anthropic worker requested — use server pool (groq, gemini, etc.)
+        {:fallback, "non-anthropic provider requested, routing to server pool"}
 
-    case Credentials.get_credentials(user_id, provider) do
-      {:ok, user_creds} ->
-        Logger.debug("Found credentials for user=#{user.username}, provider=#{provider}")
-        use_user_credentials(user_creds, messages, opts)
+      provider ->
+        case Credentials.get_credentials(user_id, provider) do
+          {:ok, user_creds} ->
+            Logger.debug("Found credentials for user=#{user.username}, provider=#{provider}")
+            use_user_credentials(user_creds, messages, opts)
 
-      {:error, :not_found} ->
-        {:fallback, "no credentials configured"}
+          {:error, :not_found} ->
+            {:fallback, "no credentials configured"}
 
-      {:error, :expired} ->
-        {:fallback, "credentials expired"}
-
-      {:error, reason} ->
-        {:fallback, "error: #{inspect(reason)}"}
+          {:error, :expired} ->
+            {:fallback, "credentials expired"}
+        end
     end
   end
 
   defp determine_provider(opts) do
+    requested_worker = Keyword.get(opts, :provider)
     model = Keyword.get(opts, :model, "")
 
     cond do
+      # Specific non-anthropic worker requested → fall back to server pool
+      is_binary(requested_worker) and not String.contains?(requested_worker, "anthropic") -> nil
       String.contains?(model, "claude") -> "anthropic_cli"
       String.contains?(model, "gpt") -> "openai"
       String.contains?(model, "gemini") -> "google"
-      true -> "anthropic_cli"  # default
+      # default: usar server pool (gemini/groq)
+      true -> nil
     end
   end
 
   # Use user's credentials instead of server API keys
   # Pattern match for OAuth (accepts both atom and string)
-  defp use_user_credentials(%{type: type} = creds, messages, opts) when type in [:oauth, "oauth"] do
+  defp use_user_credentials(%{type: type} = creds, messages, opts)
+       when type in [:oauth, "oauth"] do
     Logger.debug("Using OAuth token for provider=#{creds.provider}")
 
     # Check if credentials are still valid
-    if !ClaudeOAuthClient.credentials_valid?(creds) do
-      Logger.warning("OAuth credentials expired")
-      {:fallback, "credentials expired"}
-    else
+    if ClaudeOAuthClient.credentials_valid?(creds) do
       # Make request using OAuth token
       case ClaudeOAuthClient.chat(messages, creds, opts) do
         {:ok, stream} ->
@@ -118,6 +130,9 @@ defmodule CortexCommunityWeb.ChatController do
           Logger.error("OAuth request failed: #{inspect(reason)}")
           {:fallback, "oauth request failed: #{inspect(reason)}"}
       end
+    else
+      Logger.warning("OAuth credentials expired")
+      {:fallback, "credentials expired"}
     end
   end
 
@@ -127,7 +142,7 @@ defmodule CortexCommunityWeb.ChatController do
     # Inject user's API key into options
     opts_with_user_key = Keyword.put(opts, :api_key, api_key)
 
-    case CortexCore.chat(messages, opts_with_user_key) do
+    case @cortex_core.chat(messages, opts_with_user_key) do
       {:ok, stream} -> {:ok, stream}
       {:error, _} -> {:fallback, "user api key failed"}
     end
@@ -139,7 +154,7 @@ defmodule CortexCommunityWeb.ChatController do
 
   # Original dispatch logic (unchanged, now called when no user_id or fallback)
   defp dispatch_with_server_credentials(conn, messages, opts, start_time) do
-    case CortexCore.chat(messages, opts) do
+    case @cortex_core.chat(messages, opts) do
       {:ok, stream} ->
         # Track successful dispatch
         StatsCollector.track_request(:started)
@@ -173,11 +188,12 @@ defmodule CortexCommunityWeb.ChatController do
   end
 
   defp stream_response(conn, stream, start_time) do
-    try do
-      final_conn = Enum.reduce_while(stream, {conn, 0}, fn chunk, {acc_conn, token_count} ->
+    final_conn =
+      Enum.reduce_while(stream, {conn, 0}, fn chunk, {acc_conn, token_count} ->
         case send_sse_chunk(acc_conn, chunk) do
           {:ok, new_conn} ->
             {:cont, {new_conn, token_count + estimate_tokens(chunk)}}
+
           {:error, _reason} ->
             {:halt, {acc_conn, token_count}}
         end
@@ -206,22 +222,20 @@ defmodule CortexCommunityWeb.ChatController do
           conn_with_done
       end
 
-      final_conn
+    final_conn
+  rescue
+    error ->
+      Logger.error("Stream processing error: #{inspect(error)}")
+      StatsCollector.track_request(:stream_error)
+      conn
+  catch
+    :exit, _ ->
+      StatsCollector.track_request(:stream_exit)
+      conn
 
-    rescue
-      error ->
-        Logger.error("Stream processing error: #{inspect(error)}")
-        StatsCollector.track_request(:stream_error)
-        conn
-
-    catch
-      :exit, _ ->
-        StatsCollector.track_request(:stream_exit)
-        conn
-      _, _ ->
-        StatsCollector.track_request(:stream_error)
-        conn
-    end
+    _, _ ->
+      StatsCollector.track_request(:stream_error)
+      conn
   end
 
   defp send_sse_chunk(conn, "[DONE]") do
@@ -258,6 +272,7 @@ defmodule CortexCommunityWeb.ChatController do
   end
 
   defp maybe_add_option(opts, _key, nil), do: opts
+
   defp maybe_add_option(opts, key, value) do
     Keyword.put(opts, key, value)
   end
@@ -273,18 +288,20 @@ defmodule CortexCommunityWeb.ChatController do
   end
 
   defp format_error_details(details) when is_binary(details), do: details
+
   defp format_error_details(details) when is_list(details) do
-    Enum.map(details, fn
+    Enum.map_join(details, "; ", fn
       {provider, error} -> "#{provider}: #{error}"
       error -> to_string(error)
     end)
-    |> Enum.join("; ")
   end
+
   defp format_error_details(details), do: inspect(details)
 
   defp estimate_tokens(text) when is_binary(text) do
     # Rough estimation: ~4 characters per token
     div(String.length(text), 4)
   end
+
   defp estimate_tokens(_), do: 0
 end
