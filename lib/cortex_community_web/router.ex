@@ -39,6 +39,15 @@ defmodule CortexCommunityWeb.Router do
     post "/chat", ChatController, :create
     post "/completions", ChatController, :create  # OpenAI compatible
 
+    # Search endpoint
+    post "/search", SearchController, :create
+
+    # Tool use / function calling endpoint
+    post "/tools", ToolsController, :create
+
+    # Available models + context windows
+    get "/models", ModelsController, :index
+
     # Health and monitoring
     get "/health", HealthController, :index
     get "/health/workers", HealthController, :workers
