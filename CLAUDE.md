@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **⚠️ TWO REPOS** — This project spans two git repositories. Always commit and push both when making changes.
+> - `cortex_community` (this repo) → `github.com/chinostroza/cortex-community`
+> - `cortex_core` → `../cortex-core/cortex_core` → `github.com/chinostroza/cortex-core`
+
 ## Project Overview
 
 CortexCommunity is an open-source AI gateway built with Phoenix Framework that provides a unified interface to multiple AI providers (OpenAI, Anthropic, Google Gemini, Groq, Cohere, xAI) plus local AI support via Ollama.
