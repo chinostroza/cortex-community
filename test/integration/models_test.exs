@@ -7,7 +7,8 @@ defmodule CortexCommunity.Integration.ModelsTest do
 
   setup_all do
     unless H.server_running?() do
-      raise ExUnit.SkipError, message: "Server not running at localhost:4000 — start with `mix server` first"
+      raise ExUnit.SkipError,
+        message: "Server not running at localhost:4000 — start with `mix server` first"
     end
 
     {:ok, key: H.api_key()}
@@ -37,7 +38,9 @@ defmodule CortexCommunity.Integration.ModelsTest do
 
       Enum.each(all_workers, fn worker ->
         assert is_binary(worker["id"]), "worker id should be a string: #{inspect(worker)}"
-        assert is_binary(worker["service"]), "worker service should be a string: #{inspect(worker)}"
+
+        assert is_binary(worker["service"]),
+               "worker service should be a string: #{inspect(worker)}"
       end)
     end
   end

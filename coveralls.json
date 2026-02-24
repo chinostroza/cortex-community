@@ -23,6 +23,7 @@
     "lib/cortex_community_web.ex",
     "lib/cortex_community_web/controllers/page_html.ex",
     "lib/cortex_community_web/controllers/error_html.ex",
-    "lib/cortex_community_web/controllers/error_json.ex"
+    "lib/cortex_community_web/controllers/error_json.ex",
+    "test/support/integration_helper.ex"
   ]
 }

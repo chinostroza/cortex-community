@@ -30,7 +30,13 @@ defmodule CortexCommunity.IntegrationHelper do
 
   def post(path, body, opts \\ []) do
     headers = Keyword.get(opts, :headers, [])
-    Req.post(@base_url <> path, json: body, headers: headers, receive_timeout: @timeout, retry: false)
+
+    Req.post(@base_url <> path,
+      json: body,
+      headers: headers,
+      receive_timeout: @timeout,
+      retry: false
+    )
   end
 
   def get_sse(path, body, opts \\ []) do
@@ -39,11 +45,21 @@ defmodule CortexCommunity.IntegrationHelper do
 
     chunks = []
 
-    case Finch.build(:post, url, [{"content-type", "application/json"} | headers], Jason.encode!(body))
-         |> Finch.stream(CortexCommunity.Finch, chunks, fn
-           {:data, data}, acc -> [data | acc]
-           _, acc -> acc
-         end, [receive_timeout: @timeout]) do
+    case Finch.build(
+           :post,
+           url,
+           [{"content-type", "application/json"} | headers],
+           Jason.encode!(body)
+         )
+         |> Finch.stream(
+           CortexCommunity.Finch,
+           chunks,
+           fn
+             {:data, data}, acc -> [data | acc]
+             _, acc -> acc
+           end,
+           receive_timeout: @timeout
+         ) do
       {:ok, acc} -> {:ok, Enum.reverse(acc)}
       {:error, reason, _} -> {:error, reason}
     end

@@ -7,7 +7,8 @@ defmodule CortexCommunity.Integration.ChatTest do
 
   setup_all do
     unless H.server_running?() do
-      raise ExUnit.SkipError, message: "Server not running at localhost:4000 — start with `mix server` first"
+      raise ExUnit.SkipError,
+        message: "Server not running at localhost:4000 — start with `mix server` first"
     end
 
     {:ok, key: H.api_key()}
