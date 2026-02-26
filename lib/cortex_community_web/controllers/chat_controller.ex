@@ -189,36 +189,30 @@ defmodule CortexCommunityWeb.ChatController do
 
   defp stream_response(conn, stream, start_time) do
     final_conn =
-      Enum.reduce_while(stream, {conn, 0}, fn chunk, {acc_conn, token_count} ->
-        case send_sse_chunk(acc_conn, chunk) do
-          {:ok, new_conn} ->
-            {:cont, {new_conn, token_count + estimate_tokens(chunk)}}
+      Enum.reduce_while(stream, {conn, 0, %{}}, fn
+        {:stream_done, ratelimit_info}, {acc_conn, token_count, _} ->
+          {:cont, {acc_conn, token_count, ratelimit_info}}
 
-          {:error, _reason} ->
-            {:halt, {acc_conn, token_count}}
-        end
+        chunk, {acc_conn, token_count, ratelimit_info} ->
+          case send_sse_chunk(acc_conn, chunk) do
+            {:ok, new_conn} ->
+              {:cont, {new_conn, token_count + estimate_tokens(chunk), ratelimit_info}}
+
+            {:error, _reason} ->
+              {:halt, {acc_conn, token_count, ratelimit_info}}
+          end
       end)
       |> case do
-        {final_conn, token_count} ->
-          # Send completion event
+        {final_conn, token_count, ratelimit_info} ->
           duration = System.monotonic_time(:millisecond) - start_time
+          {:ok, conn_with_done} = send_sse_done(final_conn, ratelimit_info)
 
-          _completion_data = %{
-            event: "done",
-            tokens: token_count,
-            duration_ms: duration
-          }
-
-          {:ok, conn_with_done} = send_sse_chunk(final_conn, "[DONE]")
-
-          # Track completion
           StatsCollector.track_request(:completed, %{
             duration: duration,
             tokens: token_count
           })
 
           Logger.info("Stream completed: #{token_count} tokens in #{duration}ms")
-
           conn_with_done
       end
 
@@ -238,8 +232,15 @@ defmodule CortexCommunityWeb.ChatController do
       conn
   end
 
-  defp send_sse_chunk(conn, "[DONE]") do
-    case Plug.Conn.chunk(conn, "event: done\ndata: {\"done\": true}\n\n") do
+  defp send_sse_done(conn, ratelimit_info) do
+    payload =
+      if map_size(ratelimit_info) > 0 do
+        Jason.encode!(%{"done" => true, "ratelimit" => ratelimit_info})
+      else
+        "{\"done\": true}"
+      end
+
+    case Plug.Conn.chunk(conn, "event: done\ndata: #{payload}\n\n") do
       {:ok, conn} -> {:ok, conn}
       error -> error
     end
